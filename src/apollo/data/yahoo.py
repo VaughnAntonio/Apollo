@@ -73,6 +73,24 @@ _DURATION = {
 }
 
 
+def bar_close(
+    interval: Literal["1m", "5m", "15m", "1h", "4h", "1d"],
+    kind: Literal["future", "stock"] = "future",
+) -> pl.Expr:
+    """When a bar closes, from its open time `ts`.
+
+    A daily futures bar runs 18:00 to 17:00 ET (23h), a stock day 09:30 to 16:00. The 4H bucket
+    that opens at 14:00 ET ends at the 17:00 close, so it lasts 3h.
+    """
+    ts = pl.col("ts")
+    if interval == "4h":
+        hour = ts.dt.convert_time_zone("America/New_York").dt.hour()
+        return pl.when(hour == 14).then(ts + timedelta(hours=3)).otherwise(ts + timedelta(hours=4))
+    if interval == "1d":
+        return ts + (timedelta(hours=23) if kind == "future" else timedelta(hours=6.5))
+    return ts + _DURATION[interval]
+
+
 def drop_unfinished(
     df: pl.DataFrame,
     interval: Interval,
@@ -85,7 +103,7 @@ def drop_unfinished(
     session still trading as a partial bar. Weekend-dated futures bars are such partials.
     """
     if interval != "1d":
-        return df.filter(pl.col("ts") + _DURATION[interval] <= now.astimezone(UTC))
+        return df.filter(bar_close(interval, kind) <= now.astimezone(UTC))
     et = pl.col("ts").dt.convert_time_zone("America/New_York")
     label = (et + timedelta(hours=6) if kind == "future" else et).dt.date()
     today = now.astimezone(ZoneInfo("America/New_York")).date()

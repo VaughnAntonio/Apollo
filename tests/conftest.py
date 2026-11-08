@@ -29,3 +29,28 @@ def bars():
         )
 
     return make
+
+
+@pytest.fixture
+def ohlc():
+    """Bars with hand-written (open, high, low, close) rows, `every` apart from local `start`."""
+
+    def make(rows, start: str = "2026-11-02 18:00", every: str = "1h"):
+        t0 = datetime.fromisoformat(start).replace(tzinfo=ZoneInfo("America/New_York"))
+        t0 = t0.astimezone(ZoneInfo("UTC"))
+        step = timedelta(minutes=STEPS[every])
+        o, h, lo, c = (list(map(float, col)) for col in zip(*rows, strict=True))
+        return pl.DataFrame(
+            {
+                "ts": [t0 + i * step for i in range(len(rows))],
+                "open": o,
+                "high": h,
+                "low": lo,
+                "close": c,
+                "volume": [1] * len(rows),
+                "symbol": ["MNQ"] * len(rows),
+            },
+            schema_overrides={"ts": pl.Datetime("us", "UTC"), "volume": pl.Int64},
+        )
+
+    return make

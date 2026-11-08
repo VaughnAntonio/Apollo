@@ -1,0 +1,7 @@
+# Fractal Model rules (spec 5.6). Defaults for Vaughn to review on the detection pages.
+
+[fractal]
+sweep_ticks = 1        # C2 must trade this many ticks beyond C1's high or low
+poi_lookback = 20      # how many higher-timeframe bars back to look for swings and gaps
+poi_kinds = ["swing", "fvg"]
+outside_bar = "skip"   # a bar that sweeps both sides of C1 has no clear direction
