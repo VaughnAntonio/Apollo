@@ -1,0 +1,141 @@
+# Point value = dollars per 1.0 price point for one contract (stocks: one share).
+
+[[symbol]]
+code = "MNQ"
+yahoo = "MNQ=F"
+name = "Micro E-mini Nasdaq-100"
+kind = "future"
+point_value = 2.0
+tick_size = 0.25
+roll_rule = "equity_index_quarterly"
+model_enabled = true
+
+[[symbol]]
+code = "MES"
+yahoo = "MES=F"
+name = "Micro E-mini S&P 500"
+kind = "future"
+point_value = 5.0
+tick_size = 0.25
+roll_rule = "equity_index_quarterly"
+model_enabled = true
+
+[[symbol]]
+code = "M2K"
+yahoo = "M2K=F"
+name = "Micro E-mini Russell 2000"
+kind = "future"
+point_value = 5.0
+tick_size = 0.1
+roll_rule = "equity_index_quarterly"
+model_enabled = true
+
+[[symbol]]
+code = "MYM"
+yahoo = "MYM=F"
+name = "Micro E-mini Dow"
+kind = "future"
+point_value = 0.5
+tick_size = 1.0
+roll_rule = "equity_index_quarterly"
+model_enabled = true
+
+[[symbol]]
+code = "NQ"
+yahoo = "NQ=F"
+name = "E-mini Nasdaq-100"
+kind = "future"
+point_value = 20.0
+tick_size = 0.25
+roll_rule = "equity_index_quarterly"
+model_enabled = false
+
+[[symbol]]
+code = "ES"
+yahoo = "ES=F"
+name = "E-mini S&P 500"
+kind = "future"
+point_value = 50.0
+tick_size = 0.25
+roll_rule = "equity_index_quarterly"
+model_enabled = false
+
+[[symbol]]
+code = "MGC"
+yahoo = "MGC=F"
+name = "Micro Gold"
+kind = "future"
+point_value = 10.0
+tick_size = 0.1
+roll_rule = "none"
+model_enabled = false
+
+[[symbol]]
+code = "MCL"
+yahoo = "MCL=F"
+name = "Micro WTI Crude Oil"
+kind = "future"
+point_value = 100.0
+tick_size = 0.01
+roll_rule = "none"
+model_enabled = false
+
+[[symbol]]
+code = "NVDA"
+yahoo = "NVDA"
+name = "NVIDIA"
+kind = "stock"
+point_value = 1.0
+tick_size = 0.01
+roll_rule = "none"
+model_enabled = false
+
+[[symbol]]
+code = "AAPL"
+yahoo = "AAPL"
+name = "Apple"
+kind = "stock"
+point_value = 1.0
+tick_size = 0.01
+roll_rule = "none"
+model_enabled = false
+
+[[symbol]]
+code = "MSFT"
+yahoo = "MSFT"
+name = "Microsoft"
+kind = "stock"
+point_value = 1.0
+tick_size = 0.01
+roll_rule = "none"
+model_enabled = false
+
+[[symbol]]
+code = "TSLA"
+yahoo = "TSLA"
+name = "Tesla"
+kind = "stock"
+point_value = 1.0
+tick_size = 0.01
+roll_rule = "none"
+model_enabled = false
+
+[[symbol]]
+code = "AMZN"
+yahoo = "AMZN"
+name = "Amazon"
+kind = "stock"
+point_value = 1.0
+tick_size = 0.01
+roll_rule = "none"
+model_enabled = false
+
+[[symbol]]
+code = "META"
+yahoo = "META"
+name = "Meta Platforms"
+kind = "stock"
+point_value = 1.0
+tick_size = 0.01
+roll_rule = "none"
+model_enabled = false
