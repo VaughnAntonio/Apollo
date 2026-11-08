@@ -1,7 +1,7 @@
 import polars as pl
 
-from mnq.config import load_symbols
-from mnq.data.collect import collect, main
+from apollo.config import load_symbols
+from apollo.data.collect import collect, main
 
 
 def _two():
@@ -30,12 +30,12 @@ def test_one_failure_does_not_stop_others(tmp_path, bars):
 
 
 def test_main_exit_code_when_all_empty(tmp_path, monkeypatch):
-    monkeypatch.setattr("mnq.data.collect.fetch_bars", lambda s, i: pl.DataFrame())
+    monkeypatch.setattr("apollo.data.collect.fetch_bars", lambda s, i: pl.DataFrame())
     assert main(["--root", str(tmp_path), "--symbols", "MNQ", "--intervals", "1d"]) == 1
 
 
 def test_store_failure_does_not_stop_others(tmp_path, bars, monkeypatch):
-    import mnq.data.collect as c
+    import apollo.data.collect as c
 
     real = c.append_bars
 

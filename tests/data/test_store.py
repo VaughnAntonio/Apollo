@@ -1,4 +1,4 @@
-from mnq.data.store import append_bars, read_bars
+from apollo.data.store import append_bars, read_bars
 
 
 def test_month_split_and_idempotent(tmp_path, bars):

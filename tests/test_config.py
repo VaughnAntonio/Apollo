@@ -1,4 +1,4 @@
-from mnq.config import load_symbols
+from apollo.config import load_symbols
 
 
 def test_symbols_loaded_with_spec_values():

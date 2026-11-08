@@ -3,8 +3,8 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 
-from mnq.data.sessions import add_session_columns
-from mnq.data.yahoo import MAX_LOOKBACK, drop_unfinished, normalise_yahoo
+from apollo.data.sessions import add_session_columns
+from apollo.data.yahoo import MAX_LOOKBACK, drop_unfinished, normalise_yahoo
 
 OHLCV = {"Open": [1, 2], "High": [2, 3], "Low": [0, 1], "Close": [1.5, 2.5], "Volume": [10, 20]}
 

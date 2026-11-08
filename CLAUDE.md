@@ -1,6 +1,6 @@
-# MNQ Predictor
+# Apollo Predictor
 
-Design: `docs/superpowers/specs/2026-11-08-mnq-predictor-design.md`. Plans: `docs/superpowers/plans/`.
+Design: `docs/superpowers/specs/2026-11-08-apollo-predictor-design.md`. Plans: `docs/superpowers/plans/`.
 
 ## Skills to use in this repo
 

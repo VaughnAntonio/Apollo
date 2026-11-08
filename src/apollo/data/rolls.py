@@ -2,7 +2,7 @@ from datetime import date, timedelta
 
 import polars as pl
 
-from mnq.config import Symbol
+from apollo.config import Symbol
 
 
 def _third_friday(year: int, month: int) -> date:

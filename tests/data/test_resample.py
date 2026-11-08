@@ -1,4 +1,4 @@
-from mnq.data.resample import to_4h, to_rth_daily
+from apollo.data.resample import to_4h, to_rth_daily
 
 ET = "America/New_York"
 

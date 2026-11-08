@@ -3,7 +3,7 @@ from pathlib import Path
 
 import polars as pl
 
-from mnq.data.yahoo import BAR_SCHEMA, Interval
+from apollo.data.yahoo import BAR_SCHEMA, Interval
 
 
 def _dir(root: Path, code: str, interval: Interval) -> Path:

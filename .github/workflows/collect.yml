@@ -37,7 +37,7 @@ jobs:
 
       - run: python -m venv .venv && .venv/bin/pip install -e .
 
-      - run: .venv/bin/python -m mnq.data.collect --root data_store
+      - run: .venv/bin/python -m apollo.data.collect --root data_store
 
       - name: Commit and push new bars
         working-directory: data_store

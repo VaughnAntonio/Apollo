@@ -1,4 +1,4 @@
-# MNQ Predictor, Plan 1: Data Foundation Implementation Plan
+# Apollo Predictor, Plan 1: Data Foundation Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -8,7 +8,7 @@ tags sessions, 4H bars, roll days and data-quality problems, and collects new
 data automatically every weekday.
 
 **Architecture:**
-- A `src/mnq/data` package of small pure functions: normalise, store,
+- A `src/apollo/data` package of small pure functions: normalise, store,
   sessions, resample, rolls, quality.
 - A thin network wrapper around `yfinance`.
 - A collector CLI that takes the fetcher as a parameter, so tests never hit
@@ -19,7 +19,7 @@ data automatically every weekday.
 **Tech Stack:** Python 3.13, Polars, PyArrow, yfinance, pytest, ruff,
 pyright, GitHub Actions.
 
-**Spec:** `docs/superpowers/specs/2026-11-08-mnq-predictor-design.md`
+**Spec:** `docs/superpowers/specs/2026-11-08-apollo-predictor-design.md`
 (sections 3, 5.3, 5.13 data-quality, 6, 7).
 
 ## Roadmap (this plan is 1 of 7)
@@ -90,16 +90,16 @@ previous one has shipped, so later plans can use the real interfaces:
 pyproject.toml                         project + tool config
 .gitignore
 config/symbols.toml                    the 14 symbols with point values and ticks
-src/mnq/__init__.py
-src/mnq/config.py                      Symbol dataclass, load_symbols()
-src/mnq/data/__init__.py
-src/mnq/data/yahoo.py                  normalise_yahoo(), fetch_bars(), MAX_LOOKBACK
-src/mnq/data/store.py                  append_bars(), read_bars()
-src/mnq/data/sessions.py               add_session_columns()
-src/mnq/data/resample.py               to_4h(), to_rth_daily()
-src/mnq/data/rolls.py                  roll_windows(), mark_roll_days()
-src/mnq/data/quality.py                QualityReport, check_quality()
-src/mnq/data/collect.py                collect(), main()
+src/apollo/__init__.py
+src/apollo/config.py                      Symbol dataclass, load_symbols()
+src/apollo/data/__init__.py
+src/apollo/data/yahoo.py                  normalise_yahoo(), fetch_bars(), MAX_LOOKBACK
+src/apollo/data/store.py                  append_bars(), read_bars()
+src/apollo/data/sessions.py               add_session_columns()
+src/apollo/data/resample.py               to_4h(), to_rth_daily()
+src/apollo/data/rolls.py                  roll_windows(), mark_roll_days()
+src/apollo/data/quality.py                QualityReport, check_quality()
+src/apollo/data/collect.py                collect(), main()
 tests/conftest.py                      bar-frame factory fixture
 tests/data/test_*.py                   one per module
 .github/workflows/ci.yml
@@ -111,23 +111,23 @@ tests/data/test_*.py                   one per module
 ### Task 1: Repository scaffold and CI
 
 **Files:**
-- Create: `pyproject.toml`, `.gitignore`, `src/mnq/__init__.py`,
-  `src/mnq/data/__init__.py`, `tests/test_smoke.py`,
+- Create: `pyproject.toml`, `.gitignore`, `src/apollo/__init__.py`,
+  `src/apollo/data/__init__.py`, `tests/test_smoke.py`,
   `.github/workflows/ci.yml`
 
 **Interfaces:**
-- Produces: importable package `mnq` with `__version__ = "0.1.0"`;
+- Produces: importable package `apollo` with `__version__ = "0.1.0"`;
   `pytest`, `ruff check`, `ruff format --check`, `pyright` all runnable from
   the repo root.
 
-- [ ] **Step 1:** `git init -b main` in `/Users/vaughnantonio/Desktop/MNQ Predictor`. Create `.gitignore` with: `.venv/`, `__pycache__/`, `.superpowers/`, `*.duckdb`, `journal_media/`, `data_store/`, `.pytest_cache/`, `.ruff_cache/`, `node_modules/`, `dist/`.
+- [ ] **Step 1:** `git init -b main` in `/Users/vaughnantonio/Desktop/Apollo Predictor`. Create `.gitignore` with: `.venv/`, `__pycache__/`, `.superpowers/`, `*.duckdb`, `journal_media/`, `data_store/`, `.pytest_cache/`, `.ruff_cache/`, `node_modules/`, `dist/`.
 - [ ] **Step 2: Write the failing test** `tests/test_smoke.py`
 
 ```python
-import mnq
+import apollo
 
 def test_version():
-    assert mnq.__version__ == "0.1.0"
+    assert apollo.__version__ == "0.1.0"
 ```
 
 - [ ] **Step 3:** Run `python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"`. This fails because `pyproject.toml` doesn't exist yet. Expected: an error.
@@ -140,7 +140,7 @@ def test_version():
   - `[tool.ruff] line-length=100`;
   - `[tool.pyright] include=["src","tests"]`.
 
-  Create `src/mnq/__init__.py` with `__version__ = "0.1.0"`.
+  Create `src/apollo/__init__.py` with `__version__ = "0.1.0"`.
 - [ ] **Step 5:** Run `.venv/bin/pip install -e ".[dev]" && .venv/bin/pytest -q`. Expected: `1 passed`.
 - [ ] **Step 6:** Create `.github/workflows/ci.yml`:
   - trigger on push and pull_request;
@@ -153,7 +153,7 @@ def test_version():
 
 ```bash
 git add .gitignore pyproject.toml src tests .github docs
-git commit -m "chore: scaffold mnq package, CI, spec and plan 1"
+git commit -m "chore: scaffold apollo package, CI, spec and plan 1"
 ```
 
 ---
@@ -161,7 +161,7 @@ git commit -m "chore: scaffold mnq package, CI, spec and plan 1"
 ### Task 2: Symbol config
 
 **Files:**
-- Create: `config/symbols.toml`, `src/mnq/config.py`
+- Create: `config/symbols.toml`, `src/apollo/config.py`
 - Test: `tests/test_config.py`
 
 **Interfaces:**
@@ -176,7 +176,7 @@ git commit -m "chore: scaffold mnq package, CI, spec and plan 1"
 - [ ] **Step 1: Write the failing test**
 
 ```python
-from mnq.config import load_symbols
+from apollo.config import load_symbols
 
 def test_symbols_loaded_with_spec_values():
     s = load_symbols()
@@ -189,7 +189,7 @@ def test_symbols_loaded_with_spec_values():
     assert s["MNQ"].roll_rule == "equity_index_quarterly" and s["MGC"].roll_rule == "none"
 ```
 
-- [ ] **Step 2:** Run `.venv/bin/pytest tests/test_config.py -v`. Expected: FAIL, `ModuleNotFoundError: mnq.config`.
+- [ ] **Step 2:** Run `.venv/bin/pytest tests/test_config.py -v`. Expected: FAIL, `ModuleNotFoundError: apollo.config`.
 - [ ] **Step 3:** Write `config/symbols.toml` (one `[[symbol]]` table each; tomllib is in the standard library) with these values from spec 5.6 ("eq" = `equity_index_quarterly`):
 
   | code | yahoo | point | tick | roll | model |
@@ -204,7 +204,7 @@ def test_symbols_loaded_with_spec_values():
   | MCL | MCL=F | 100 | 0.01 | none | false |
   | NVDA, AAPL, MSFT, TSLA, AMZN, META | same as code | 1 | 0.01 | none | false |
 
-  Then implement `src/mnq/config.py` (`CONFIG_DIR` = repo `config/` resolved
+  Then implement `src/apollo/config.py` (`CONFIG_DIR` = repo `config/` resolved
   from `__file__`).
 - [ ] **Step 4:** Run the test. Expected: PASS.
 - [ ] **Step 5: Commit** `feat: symbol config with point values and ticks`.
@@ -214,7 +214,7 @@ def test_symbols_loaded_with_spec_values():
 ### Task 3: Yahoo normalisation and the Parquet store
 
 **Files:**
-- Create: `src/mnq/data/yahoo.py`, `src/mnq/data/store.py`,
+- Create: `src/apollo/data/yahoo.py`, `src/apollo/data/store.py`,
   `tests/conftest.py`
 - Test: `tests/data/test_yahoo.py`, `tests/data/test_store.py`
 
@@ -246,7 +246,7 @@ def test_symbols_loaded_with_spec_values():
 ```python
 # tests/data/test_yahoo.py
 import pandas as pd
-from mnq.data.yahoo import normalise_yahoo
+from apollo.data.yahoo import normalise_yahoo
 
 def test_intraday_tz_aware_converted_to_utc():
     idx = pd.DatetimeIndex(["2026-11-02 09:30", "2026-11-02 09:35"]).tz_localize("America/New_York")
@@ -267,7 +267,7 @@ def test_empty_and_null_rows():
 
 ```python
 # tests/data/test_store.py
-from mnq.data.store import append_bars, read_bars
+from apollo.data.store import append_bars, read_bars
 
 def test_month_split_and_idempotent(tmp_path, bars):
     df = bars("2026-10-30 09:30", 6 * 24 * 4, "1h")  # crosses into November
@@ -308,7 +308,7 @@ def test_later_revision_wins(tmp_path, bars):
 ### Task 4: Session tagging
 
 **Files:**
-- Create: `src/mnq/data/sessions.py`
+- Create: `src/apollo/data/sessions.py`
 - Test: `tests/data/test_sessions.py`
 
 **Interfaces:**
@@ -325,7 +325,7 @@ def test_later_revision_wins(tmp_path, bars):
 ```python
 import polars as pl
 from datetime import datetime, timezone
-from mnq.data.sessions import add_session_columns
+from apollo.data.sessions import add_session_columns
 
 def _one(ts_utc):
     return add_session_columns(pl.DataFrame({"ts": [ts_utc]}).with_columns(pl.col("ts").dt.replace_time_zone("UTC")))
@@ -354,7 +354,7 @@ def test_dst_change_day():
 ### Task 5: Resampling to 4H and to the NY session
 
 **Files:**
-- Create: `src/mnq/data/resample.py`
+- Create: `src/apollo/data/resample.py`
 - Test: `tests/data/test_resample.py`
 
 **Interfaces:**
@@ -372,7 +372,7 @@ def test_dst_change_day():
 
 ```python
 import polars as pl
-from mnq.data.resample import to_4h, to_rth_daily
+from apollo.data.resample import to_4h, to_rth_daily
 
 def test_4h_aggregates_and_anchors(bars):
     h = bars("2026-11-03 18:00", 8, "1h")           # Tue 18:00 ET .. Wed 01:00 ET
@@ -407,7 +407,7 @@ def test_rth_daily_uses_only_session(bars):
 ### Task 6: Roll days
 
 **Files:**
-- Create: `src/mnq/data/rolls.py`
+- Create: `src/apollo/data/rolls.py`
 - Test: `tests/data/test_rolls.py`
 
 **Interfaces:**
@@ -424,7 +424,7 @@ def test_rth_daily_uses_only_session(bars):
 
 ```python
 from datetime import date
-from mnq.data.rolls import roll_windows
+from apollo.data.rolls import roll_windows
 
 def test_2026_windows():
     w = roll_windows(date(2026, 1, 1), date(2026, 12, 31))
@@ -446,7 +446,7 @@ def test_2026_windows():
 ### Task 7: Data-quality report
 
 **Files:**
-- Create: `src/mnq/data/quality.py`
+- Create: `src/apollo/data/quality.py`
 - Test: `tests/data/test_quality.py`
 
 **Interfaces:**
@@ -469,7 +469,7 @@ def test_2026_windows():
 
 ```python
 import polars as pl
-from mnq.data.quality import check_quality
+from apollo.data.quality import check_quality
 
 def test_weekend_and_daily_break_not_gaps(bars):
     df = bars("2026-11-06 15:00", 2, "1h").vstack(bars("2026-11-08 18:00", 2, "1h"))  # Fri → Sun
@@ -495,7 +495,7 @@ def test_bad_tick(bars):
 ### Task 8: Collector CLI
 
 **Files:**
-- Create: `src/mnq/data/collect.py`
+- Create: `src/apollo/data/collect.py`
 - Test: `tests/data/test_collect.py`
 
 **Interfaces:**
@@ -510,14 +510,14 @@ def test_bad_tick(bars):
     (default `data_store`), `--symbols` (comma list or `all`),
     `--intervals` (default `1m,5m,15m,1h,1d`). Returns 1 only if every pair
     raised or returned empty.
-  - Run as `python -m mnq.data.collect`.
+  - Run as `python -m apollo.data.collect`.
 
 - [ ] **Step 1: Write the failing tests**
 
 ```python
 import polars as pl
-from mnq.config import load_symbols
-from mnq.data.collect import collect, main
+from apollo.config import load_symbols
+from apollo.data.collect import collect, main
 
 def test_collect_writes_and_reports(tmp_path, bars):
     syms = {k: v for k, v in load_symbols().items() if k in ("MNQ", "NVDA")}
@@ -534,14 +534,14 @@ def test_one_failure_does_not_stop_others(tmp_path, bars):
     assert collect(tmp_path, syms, ["5m"], fetch=fetch) == {"MNQ/5m": 5, "NVDA/5m": 0}
 
 def test_main_exit_code_when_all_empty(tmp_path, monkeypatch):
-    monkeypatch.setattr("mnq.data.collect.fetch_bars", lambda s, i: pl.DataFrame())
+    monkeypatch.setattr("apollo.data.collect.fetch_bars", lambda s, i: pl.DataFrame())
     assert main(["--root", str(tmp_path), "--symbols", "MNQ", "--intervals", "1d"]) == 1
 ```
 
 - [ ] **Step 2:** Run the tests. Expected: FAIL.
 - [ ] **Step 3:** Implement. Catch exceptions per pair with `logging.warning`; skip empty frames.
 - [ ] **Step 4:** Run the tests. Expected: PASS.
-- [ ] **Step 5: Real run.** Run `.venv/bin/python -m mnq.data.collect --symbols MNQ --intervals 1h,1d`. Expected: logs rows written; `data_store/bars/MNQ/1d/` holds monthly files back to 2019; the quality JSON exists.
+- [ ] **Step 5: Real run.** Run `.venv/bin/python -m apollo.data.collect --symbols MNQ --intervals 1h,1d`. Expected: logs rows written; `data_store/bars/MNQ/1d/` holds monthly files back to 2019; the quality JSON exists.
 - [ ] **Step 6: Commit** `feat: collector CLI`.
 
 ---
@@ -552,7 +552,7 @@ def test_main_exit_code_when_all_empty(tmp_path, monkeypatch):
 - Create: `.github/workflows/collect.yml`
 
 **Interfaces:**
-- Consumes: `python -m mnq.data.collect`.
+- Consumes: `python -m apollo.data.collect`.
 - Produces: commits to branch `data` with `data_store/bars/**` and
   `data_store/quality/**`.
 
@@ -567,7 +567,7 @@ def test_main_exit_code_when_all_empty(tmp_path, monkeypatch):
     `github-actions[bot]` only if there are changes, push `data`.
 - [ ] **Step 2:** Validate the YAML locally with `python -c "import yaml,sys; yaml.safe_load(open('.github/workflows/collect.yml'))"`. If PyYAML is missing, skip this step; CI's first run validates it. Expected: no error.
 - [ ] **Step 3: Commit** `ci: weekday data collection to data branch`.
-- [ ] **Step 4: Hand-off check.** Pushing needs a GitHub remote. **Ask Vaughn** before creating the repo (`gh repo create VaughnAntonio/mnq-predictor --public --source . --push`). After the push, trigger `gh workflow run collect.yml`. Expected: a green run and a `data` branch containing `data_store/bars/MNQ/...`.
+- [ ] **Step 4: Hand-off check.** Pushing needs a GitHub remote. **Ask Vaughn** before creating the repo (`gh repo create VaughnAntonio/Apollo --public --source . --push`). After the push, trigger `gh workflow run collect.yml`. Expected: a green run and a `data` branch containing `data_store/bars/MNQ/...`.
 
 ---
 

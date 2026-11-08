@@ -1,6 +1,6 @@
 """Download new bars for every configured symbol and store them.
 
-Run: python -m mnq.data.collect --root data_store --symbols all --intervals 1m,5m,15m,1h,1d
+Run: python -m apollo.data.collect --root data_store --symbols all --intervals 1m,5m,15m,1h,1d
 """
 
 import argparse
@@ -12,10 +12,10 @@ from typing import cast
 
 import polars as pl
 
-from mnq.config import Symbol, load_symbols
-from mnq.data.quality import check_quality
-from mnq.data.store import append_bars
-from mnq.data.yahoo import Interval, fetch_bars
+from apollo.config import Symbol, load_symbols
+from apollo.data.quality import check_quality
+from apollo.data.store import append_bars
+from apollo.data.yahoo import Interval, fetch_bars
 
 log = logging.getLogger(__name__)
 Fetch = Callable[[Symbol, Interval], pl.DataFrame]

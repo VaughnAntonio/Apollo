@@ -7,8 +7,8 @@ from zoneinfo import ZoneInfo
 
 import polars as pl
 
-from mnq.data.sessions import ET, add_session_columns
-from mnq.data.yahoo import Interval
+from apollo.data.sessions import ET, add_session_columns
+from apollo.data.yahoo import Interval
 
 TZ = ZoneInfo(ET)
 MINUTES = {"1m": 1, "5m": 5, "15m": 15, "1h": 60, "1d": 1440}

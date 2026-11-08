@@ -4,7 +4,7 @@ from zoneinfo import ZoneInfo
 
 import polars as pl
 
-from mnq.data.quality import check_quality
+from apollo.data.quality import check_quality
 
 
 def test_weekend_and_daily_break_not_gaps(bars):

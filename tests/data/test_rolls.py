@@ -1,8 +1,8 @@
 from datetime import date
 
-from mnq.config import load_symbols
-from mnq.data.rolls import mark_roll_days, roll_windows
-from mnq.data.sessions import add_session_columns
+from apollo.config import load_symbols
+from apollo.data.rolls import mark_roll_days, roll_windows
+from apollo.data.sessions import add_session_columns
 
 
 def test_2026_windows():

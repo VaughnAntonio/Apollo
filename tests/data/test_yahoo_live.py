@@ -1,7 +1,7 @@
 import pytest
 
-from mnq.config import load_symbols
-from mnq.data.yahoo import BAR_SCHEMA, fetch_bars
+from apollo.config import load_symbols
+from apollo.data.yahoo import BAR_SCHEMA, fetch_bars
 
 
 @pytest.mark.network

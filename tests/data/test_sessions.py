@@ -2,7 +2,7 @@ from datetime import datetime
 
 import polars as pl
 
-from mnq.data.sessions import add_session_columns
+from apollo.data.sessions import add_session_columns
 
 
 def _one(ts_utc: datetime) -> pl.DataFrame:

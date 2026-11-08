@@ -1,4 +1,4 @@
-# MNQ Predictor: design
+# Apollo Predictor: design
 
 Date: 2026-11-08
 Owner: Vaughn Antonio
@@ -133,7 +133,8 @@ Reference mockup:
 `.superpowers/brainstorm/90195-1794176385/content/layout-a-v5-menu.html`.
 
 - **Layout A:**
-  - a top bar: menu button, wordmark, ticker picker, timeframe tabs
+  - a top bar: menu button, the APOLLO wordmark (uppercase with a small raised ©, like
+    the Portfoliov2 name logo), ticker picker, timeframe tabs
     D · 4H · 1H · 15m · 5m · 1m, Trades toggle, "Delayed 10m";
   - one large chart;
   - a 260px right rail split by hairlines (no cards) into **Top-down
@@ -514,10 +515,10 @@ these was found in comparable repos.
 ## 6. Repository layout (proposed)
 
 ```
-mnq-predictor/
+apollo-predictor/
   pyproject.toml
   config/            symbols.toml, strategy.toml, accounts.toml
-  src/mnq/
+  src/apollo/
     data/            yahoo.py, collect.py, sessions.py, resample.py, rolls.py
     features/        health.py (spectral kurtosis, envelope, crest, RMS), basic.py
     models/          regime.py, range.py
@@ -526,7 +527,7 @@ mnq-predictor/
     journal/         store.py, importer.py, snapshot.py
     api/             main.py
     export/          snapshot.py
-  tests/             mirrors src/mnq
+  tests/             mirrors src/apollo
   web/               Vite + React app
   .github/workflows/ collect.yml, publish.yml
   docs/superpowers/  specs/, plans/

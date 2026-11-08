@@ -1,6 +1,6 @@
 import polars as pl
 
-from mnq.data.sessions import add_session_columns
+from apollo.data.sessions import add_session_columns
 
 _OHLCV = [
     pl.col("open").first(),

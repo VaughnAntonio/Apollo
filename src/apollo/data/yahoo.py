@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 import polars as pl
 
-from mnq.config import Symbol
+from apollo.config import Symbol
 
 Interval = Literal["1m", "5m", "15m", "1h", "1d"]
 
