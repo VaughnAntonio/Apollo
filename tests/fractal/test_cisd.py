@@ -59,3 +59,25 @@ def test_bear_mirror(ohlc, bull_setup):
     rows += [(101.0, 101.1, 100.0, 100.1), (100.1, 100.2, 98.6, 98.8)]  # closes below 99
     c = find_cisd(ohlc(rows, START, "5m"), "5m", bear, END)
     assert c is not None and (c.level, c.protected) == (99.0, 101.2)
+
+
+def test_run_that_starts_before_c2_open_keeps_its_first_open(ohlc, bull_setup):
+    rows = [
+        (101.6, 101.7, 101.2, 101.3),  # 09:20, the run starts here: open 101.6
+        (101.3, 101.4, 100.9, 101.0),  # 09:25
+        (101.0, 101.1, 100.2, 100.4),  # 09:30, C2 opens mid-run
+        (100.4, 100.5, 99.4, 99.6),
+        (99.6, 101.3, 99.5, 101.2),  # above 101.0 but not above 101.6: no CISD yet
+        (101.2, 101.8, 101.1, 101.7),  # above 101.6: CISD
+    ]
+    c = find_cisd(ohlc(rows, "2026-11-03 09:20", "5m"), "5m", bull_setup, END)
+    assert c is not None and c.level == 101.6 and str(c.ts) == "2026-11-03 14:45:00+00:00"
+
+
+def test_not_before_skips_early_confirmation(ohlc, bull_setup):
+    rows = [(101, 101.5, 100.2, 100.5), (100.5, 100.6, 99.5, 99.8), (99.8, 101.4, 99.7, 101.2)]
+    rows += [(101.2, 101.4, 101.0, 101.3)] * 12  # 09:45 to 10:40, holding above 101
+    early = find_cisd(ohlc(rows, START, "5m"), "5m", bull_setup, END)
+    late = find_cisd(ohlc(rows, START, "5m"), "5m", bull_setup, END, not_before=bull_setup.c2_close)
+    assert early is not None and early.early
+    assert late is not None and not late.early and late.confirmed_at >= bull_setup.c2_close

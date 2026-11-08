@@ -176,7 +176,7 @@ function show(i) {
   line(htfS, s.eq, 'EQ', s.eq_broken ? css('--down') : css('--muted'), 1);
 
   // Lower timeframe: the CISD window.
-  const from = s.c2_ts - htfLen, to = s.c2_close + 2 * htfLen;
+  const from = s.c2_ts - htfLen, to = s.window_end; // C3's close, so a Monday C3 after a Friday C2 shows
   const sub = DATA.ltf.filter(b => b.time >= from && b.time <= to);
   ltfS.setData(sub);
   ltfS.setMarkers(s.cisd_ts ? [{ time: s.cisd_ts, position: bull ? 'belowBar' : 'aboveBar', color: css('--ink'), shape: bull ? 'arrowUp' : 'arrowDown', text: s.early ? 'CISD early' : 'CISD' }] : []);

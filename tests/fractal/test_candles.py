@@ -63,3 +63,22 @@ def test_fvg_poi(ohlc):
     ]
     (s,) = detect_c2(ohlc(rows + [(98.2, 98.6, 97.2, 98.4)]), "1h", TICK, CFG)[0]
     assert (s.poi_kind, s.poi_level) == ("fvg", 97.5)
+
+
+def test_one_tick_stock_sweep_with_float_prices(ohlc):
+    # 1.13 - 0.01 is 1.1199999... in floats; a one-tick sweep to 1.12 must still count.
+    rows = [
+        (1.20, 1.21, 1.16, 1.18),
+        (1.18, 1.19, 1.125, 1.15),  # swing low 1.125
+        (1.15, 1.20, 1.14, 1.19),
+        (1.19, 1.20, 1.13, 1.15),  # C1
+        (1.15, 1.17, 1.12, 1.16),  # C2 sweeps 1.13 by one tick
+    ]
+    setups = detect_c2(ohlc(rows), "1h", 0.01, CFG)[0]
+    assert [s.c2_idx for s in setups] == [4]
+
+
+def test_stock_daily_close_is_six_and_a_half_hours(ohlc):
+    rows = BASE + [(97.5, 99, 94.5, 98.5)]
+    (s,) = detect_c2(ohlc(rows, "2026-11-02 09:30", "1d"), "1d", TICK, CFG, kind="stock")[0]
+    assert (s.c2_close - s.c2_ts).total_seconds() == 6.5 * 3600

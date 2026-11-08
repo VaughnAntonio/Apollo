@@ -20,9 +20,16 @@ class Cisd:
 
 
 def find_cisd(
-    ltf: pl.DataFrame, ltf_interval: str, setup: Setup, window_end: datetime
+    ltf: pl.DataFrame,
+    ltf_interval: str,
+    setup: Setup,
+    window_end: datetime,
+    not_before: datetime | None = None,
 ) -> Cisd | None:
     """Find the first CISD after C2's sweep, up to `window_end`.
+
+    With `not_before`, only a confirmation that closes at or after it counts (for example C2's
+    close, when the setup itself is known).
 
     Bullish: once the lower timeframe trades below C1's low, a candle that closes above the open
     of the down-close run that made the lowest low confirms it. Bearish mirrors this, so it runs
@@ -32,7 +39,8 @@ def find_cisd(
         ltf.sort("ts")
         .with_columns(close_ts=bar_close(ltf_interval))  # type: ignore[arg-type]
         .filter(
-            (pl.col("ts") >= setup.c2_ts.astimezone(UTC))
+            # One HTF bar of history before C2 so a down run that began earlier keeps its start.
+            (pl.col("ts") >= (setup.c2_ts - (setup.c2_close - setup.c2_ts)).astimezone(UTC))
             & (pl.col("close_ts") <= window_end.astimezone(UTC))
         )
     )
@@ -46,7 +54,8 @@ def find_cisd(
     ts, close_ts = w["ts"].to_list(), w["close_ts"].to_list()
 
     low_so_far, level, eq_broken = float("inf"), None, False
-    for i in range(len(c)):
+    start_i = next((i for i, t in enumerate(ts) if t >= setup.c2_ts), len(ts))
+    for i in range(start_i, len(c)):
         if lo[i] <= low_so_far:
             low_so_far = lo[i]
             end = i if c[i] < o[i] else i - 1  # the run of down closes that made this low
@@ -56,7 +65,8 @@ def find_cisd(
             level = o[start] if end >= 0 and c[end] < o[end] else level
         if ts[i] >= setup.c2_close and lo[i] < eq:
             eq_broken = True
-        if level is not None and low_so_far < c1 and c[i] > level:
+        ready = not_before is None or close_ts[i] >= not_before
+        if level is not None and low_so_far < c1 and c[i] > level and ready:
             return Cisd(
                 ts=ts[i],
                 confirmed_at=close_ts[i],

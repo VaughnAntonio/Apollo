@@ -1,5 +1,6 @@
 """Run the Fractal Model over one timeframe pairing: C2/C3 on the higher, CISD on the lower."""
 
+from datetime import timedelta
 from pathlib import Path
 from typing import Literal
 
@@ -46,15 +47,30 @@ SCHEMA = {
     "protected": pl.Float64,
     "early": pl.Boolean,
     "eq_broken": pl.Boolean,
+    "window_end": _TS,
+    "after_c2_cisd_ts": _TS,
+    "after_c2_cisd_confirmed_at": _TS,
+    "after_c2_cisd_level": pl.Float64,
+    "after_c2_protected": pl.Float64,
     "skipped_outside": pl.Int64,
 }
 COLUMNS = list(SCHEMA)
 
 
+def complete_4h(h1: pl.DataFrame) -> pl.DataFrame:
+    """4H bars built from 1H, without a last bucket that is still filling."""
+    if h1.is_empty():
+        return to_4h(h1)
+    last_close = h1["ts"].max() + timedelta(hours=1)  # type: ignore[operator]
+    return to_4h(h1).filter(bar_close("4h") <= last_close)
+
+
 def load_pair(root: Path, code: str, pairing: Pairing) -> tuple[pl.DataFrame, pl.DataFrame]:
     """Read the stored higher- and lower-timeframe bars for a pairing."""
     htf_i, ltf_i = PAIRINGS[pairing]
-    htf = to_4h(read_bars(root, code, "1h")) if htf_i == "4h" else read_bars(root, code, htf_i)  # type: ignore[arg-type]
+    htf = (
+        complete_4h(read_bars(root, code, "1h")) if htf_i == "4h" else read_bars(root, code, htf_i)
+    )  # type: ignore[arg-type]
     return htf, read_bars(root, code, ltf_i)  # type: ignore[arg-type]
 
 
@@ -71,7 +87,7 @@ def run_model(
     htf_i, ltf_i = PAIRINGS[pairing]
     sym = load_symbols()[code]
     htf = htf.sort("ts").with_columns(close_ts=bar_close(htf_i, sym.kind))  # type: ignore[arg-type]
-    setups, skipped = detect_c2(htf, htf_i, sym.tick_size, load_fractal_config())
+    setups, skipped = detect_c2(htf, htf_i, sym.tick_size, load_fractal_config(), sym.kind)
     rolls = mark_roll_days(add_session_columns(htf), sym)["near_roll"].to_list()
     ts, close_ts = htf["ts"].to_list(), htf["close_ts"].to_list()
     first_ltf = ltf["ts"].min() if ltf.height else None
@@ -84,6 +100,7 @@ def run_model(
         else:
             window_end = s.c2_close + (s.c2_close - s.c2_ts)
         cisd = None if missing else find_cisd(ltf, ltf_i, s, window_end)
+        late = None if missing else find_cisd(ltf, ltf_i, s, window_end, not_before=s.c2_close)
         rows.append(
             {
                 "code": code,
@@ -108,6 +125,11 @@ def run_model(
                 "protected": cisd.protected if cisd else None,
                 "early": cisd.early if cisd else None,
                 "eq_broken": cisd.eq_broken if cisd else None,
+                "window_end": window_end,
+                "after_c2_cisd_ts": late.ts if late else None,
+                "after_c2_cisd_confirmed_at": late.confirmed_at if late else None,
+                "after_c2_cisd_level": late.level if late else None,
+                "after_c2_protected": late.protected if late else None,
                 "skipped_outside": skipped,
             }
         )

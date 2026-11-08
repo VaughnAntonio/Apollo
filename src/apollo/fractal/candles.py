@@ -54,11 +54,15 @@ def _poi(
 
 
 def detect_c2(
-    htf: pl.DataFrame, interval: str, tick: float, cfg: FractalConfig
+    htf: pl.DataFrame,
+    interval: str,
+    tick: float,
+    cfg: FractalConfig,
+    kind: Literal["future", "stock"] = "future",
 ) -> tuple[list[Setup], int]:
     """Find C2 reversal closures at a point of interest. Returns setups and skipped outside bars."""
     # shortcut: a plain loop over rows; higher-timeframe frames are a few thousand rows at most.
-    df = htf.sort("ts").with_columns(close_ts=bar_close(interval))  # type: ignore[arg-type]
+    df = htf.sort("ts").with_columns(close_ts=bar_close(interval, kind))  # type: ignore[arg-type]
     o, h, lo, c = (df[k].to_list() for k in ("open", "high", "low", "close"))
     ts, close_ts = df["ts"].to_list(), df["close_ts"].to_list()
     sw = swing_points(df)
@@ -70,13 +74,18 @@ def detect_c2(
         k: fv.filter(kind=k).select("idx", "bottom", "top", "filled_idx").rows()
         for k in ("bull", "bear")
     }
-    sweep = cfg.sweep_ticks * tick
+
+    def ticks_past(a: float, b: float) -> bool:
+        # Count whole ticks so float noise (1.13 - 0.01 = 1.1199...) can't hide a one-tick sweep.
+        return round((a - b) / tick, 6) >= cfg.sweep_ticks
+
     setups, skipped = [], 0
     for j in range(1, df.height):
         c1_low, c1_high = lo[j - 1], h[j - 1]
-        bull = lo[j] <= c1_low - sweep and c[j] > c1_low
-        bear = h[j] >= c1_high + sweep and c[j] < c1_high
-        if (lo[j] <= c1_low - sweep and h[j] >= c1_high + sweep) and c1_low < c[j] < c1_high:
+        swept_low, swept_high = ticks_past(c1_low, lo[j]), ticks_past(h[j], c1_high)
+        bull = swept_low and c[j] > c1_low
+        bear = swept_high and c[j] < c1_high
+        if swept_low and swept_high and c1_low < c[j] < c1_high:
             skipped += 1
             continue
         sides: tuple[tuple[Literal["bull", "bear"], bool], ...] = (("bull", bull), ("bear", bear))

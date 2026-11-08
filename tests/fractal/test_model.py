@@ -46,3 +46,19 @@ def test_ltf_missing_for_old_setup(ohlc_long):
 def test_real_mnq_runs():
     out = run_model(Path("data_store"), "MNQ", "D-1H")
     assert out.height > 0 and out.columns == COLUMNS
+
+
+def test_partial_4h_bucket_dropped(bars):
+    from apollo.fractal.model import complete_4h
+
+    h1 = bars("2026-11-03 18:00", 6, "1h")  # 18:00-23:00 ET: one full bucket, one half bucket
+    out = complete_4h(h1)
+    assert out.height == 1 and out["bars_in"][0] == 4
+
+
+def test_window_end_and_after_c2_columns(ohlc_long):
+    htf, ltf = ohlc_long
+    out = run_model(NOWHERE, "MNQ", "1H-5m", htf=htf, ltf=ltf)
+    first = out.filter(pl.col("c2_ts") == htf["ts"][4])
+    assert first["window_end"][0] == htf["ts"][6]  # C3 (row 5) closes when row 6 opens
+    assert "after_c2_cisd_ts" in out.columns
