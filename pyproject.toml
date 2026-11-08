@@ -31,3 +31,6 @@ venvPath = "."
 venv = ".venv"
 
 
+
+[tool.setuptools.package-data]
+apollo = ["review/*.html"]

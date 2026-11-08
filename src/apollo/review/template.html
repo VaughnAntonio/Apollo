@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Apollo detection review</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+  /* Portfoliov2 tokens (spec 5.2). Candle colours pass the dataviz colour-blind check;
+     up candles are hollow so direction never depends on colour alone. */
+  :root{--bg:#e8eaec;--ink:#262933;--muted:#565a64;--line:#c4c7cd;--soft:#dfe1e4;--panel:#f4f4f4;
+        --brand:#3d5a4a;--brand-fg:#f4f4f4;--up:#1f7a6a;--down:#b5532f}
+  @media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#17191e;--ink:#e3e5e8;--muted:#8b9099;
+        --line:#2e323a;--soft:#22252c;--panel:#1d2026;--brand:#7fa68f;--brand-fg:#17191e;--up:#46a892;--down:#d9744c}}
+  :root[data-theme=dark]{--bg:#17191e;--ink:#e3e5e8;--muted:#8b9099;--line:#2e323a;--soft:#22252c;--panel:#1d2026;
+        --brand:#7fa68f;--brand-fg:#17191e;--up:#46a892;--down:#d9744c}
+  *{box-sizing:border-box;margin:0}
+  body{background:var(--bg);color:var(--ink);font:13px/1.45 'Geist',sans-serif;-webkit-font-smoothing:antialiased}
+  button{all:unset;cursor:pointer;box-sizing:border-box}
+  button:focus-visible,textarea:focus-visible{outline:1px solid var(--ink);outline-offset:2px}
+  .mono{font-family:'Geist Mono',monospace;font-variant-numeric:tabular-nums}
+  .label{font:500 10px 'Geist Mono',monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+  .app{min-height:100dvh;display:grid;grid-template-rows:auto 1fr auto}
+  header{display:flex;flex-wrap:wrap;align-items:center;gap:24px;padding:12px 20px;border-bottom:1px solid var(--line)}
+  .word{font-weight:600;font-size:16px;letter-spacing:-.02em}
+  .word sup{font-size:.4em;font-weight:500;margin-left:1px}
+  .meta{color:var(--muted)}
+  .grow{flex:1}
+  .seg{display:flex;border:1px solid var(--line);border-radius:4px;overflow:hidden}
+  .seg button{padding:5px 10px;font:500 10px 'Geist Mono',monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  .seg button[aria-pressed=true]{background:var(--ink);color:var(--bg)}
+  .dl{padding:6px 12px;background:var(--brand);color:var(--brand-fg);border-radius:4px;font:500 10px 'Geist Mono',monospace;letter-spacing:.1em;text-transform:uppercase}
+  main{display:grid;grid-template-columns:300px 1fr;min-height:0}
+  .list{border-right:1px solid var(--line);overflow:auto;max-height:calc(100dvh - 120px)}
+  .item{display:grid;grid-template-columns:10px 1fr auto;gap:4px 10px;align-items:center;width:100%;padding:9px 16px;border-bottom:1px solid var(--line)}
+  .item:hover,.item[aria-current]{background:var(--soft)}
+  .item small{grid-column:2/4;color:var(--muted)}
+  .dot{width:7px;height:7px;border-radius:50%;border:1px solid var(--muted)}
+  .dot.right{background:var(--up);border-color:var(--up)}
+  .dot.wrong{background:var(--down);border-color:var(--down)}
+  .dot.unsure{background:var(--muted)}
+  .charts{display:grid;grid-template-rows:auto 1fr auto 1fr;min-width:0;min-height:0}
+  .cap{display:flex;gap:16px;align-items:baseline;padding:10px 20px 4px;flex-wrap:wrap}
+  .chart{position:relative;min-height:260px;min-width:0}
+  .note-over{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);pointer-events:none;padding:20px;text-align:center}
+  .facts{display:flex;flex-wrap:wrap;gap:6px 20px;color:var(--muted)}
+  .facts b{color:var(--ink);font-weight:500}
+  footer{display:grid;grid-template-columns:auto auto 1fr auto;gap:16px;align-items:center;padding:12px 20px;border-top:1px solid var(--line)}
+  .verdict{display:flex;gap:6px}
+  .verdict button{padding:7px 14px;border:1px solid var(--line);border-radius:4px}
+  .verdict button[aria-pressed=true][data-v=right]{background:var(--up);border-color:var(--up);color:#fff}
+  .verdict button[aria-pressed=true][data-v=wrong]{background:var(--down);border-color:var(--down);color:#fff}
+  .verdict button[aria-pressed=true][data-v=unsure]{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+  textarea{width:100%;min-height:34px;resize:vertical;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:4px;padding:7px 10px;font:inherit}
+  .empty{padding:60px 20px;color:var(--muted)}
+  @media (max-width:767px){main{grid-template-columns:1fr}.list{max-height:30dvh;border-right:0;border-bottom:1px solid var(--line)}
+    footer{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="word">APOLLO<sup>&copy;</sup></div>
+    <span class="mono" id="title"></span>
+    <span class="meta">Detection review. Mark each setup, then download your verdicts.</span>
+    <span class="grow"></span>
+    <span class="meta mono" id="progress"></span>
+    <div class="seg" id="theme"><button data-t="light">Light</button><button data-t="dark">Dark</button><button data-t="auto">Auto</button></div>
+    <button class="dl" id="download">Download verdicts</button>
+  </header>
+  <main id="main">
+    <nav class="list" id="list" aria-label="Setups"></nav>
+    <section class="charts">
+      <div class="cap"><span class="label" id="htfLabel"></span><span class="facts" id="facts"></span></div>
+      <div class="chart" id="htf"></div>
+      <div class="cap"><span class="label" id="ltfLabel"></span><span class="facts" id="ltfFacts"></span></div>
+      <div class="chart" id="ltf"><div class="note-over" id="ltfNote" hidden></div></div>
+    </section>
+  </main>
+  <footer>
+    <div class="verdict" id="verdict">
+      <button data-v="right">Right</button><button data-v="wrong">Wrong</button><button data-v="unsure">Unsure</button>
+    </div>
+    <span class="meta">j / k: next / previous</span>
+    <textarea id="note" placeholder="What's off? e.g. the swing at 21,480 isn't one I'd mark"></textarea>
+    <span class="meta mono">Research tool. Not financial advice.</span>
+  </footer>
+</div>
+<script>
+const DATA = /*__DATA__*/;
+const $ = s => document.querySelector(s);
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const KEY = `apollo-review-${DATA.code}-${DATA.pairing}`;
+const store = {
+  get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+const verdicts = store.get(KEY, {});
+const S = DATA.setups;
+let cur = 0, charts = [], lines = [];
+
+const et = new Intl.DateTimeFormat('en-GB', { timeZone: 'America/New_York', year: 'numeric', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+const etDay = new Intl.DateTimeFormat('en-GB', { timeZone: 'America/New_York', month: 'short', day: '2-digit' });
+const etTime = new Intl.DateTimeFormat('en-GB', { timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit' });
+const fmt = t => et.format(new Date(t * 1000)) + ' ET';
+// A daily futures bar opens 18:00 ET the evening before; name it by its trading day instead.
+const dayFmt = new Intl.DateTimeFormat('en-GB', { timeZone: 'America/New_York', weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
+const when = s => DATA.htf_interval === '1d' ? dayFmt.format(new Date((s.c2_ts + 6 * 3600) * 1000)) : fmt(s.c2_ts).replace(' ET', '');
+const num = x => x == null ? 'n/a' : x.toLocaleString('en-US', { maximumFractionDigits: 2 });
+
+$('#title').textContent = `${DATA.code} · ${DATA.pairing} · ${S.length} setups`;
+$('#htfLabel').textContent = `Higher timeframe · ${DATA.htf_interval}`;
+$('#ltfLabel').textContent = `Lower timeframe · ${DATA.ltf_interval}`;
+
+// Theme
+function setTheme(t) {
+  t === 'auto' ? document.documentElement.removeAttribute('data-theme') : document.documentElement.dataset.theme = t;
+  [...$('#theme').children].forEach(b => b.setAttribute('aria-pressed', b.dataset.t === t));
+  store.set('apollo-theme', t);
+  if (S.length) { build(); show(cur); }
+}
+$('#theme').onclick = e => e.target.dataset.t && setTheme(e.target.dataset.t);
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => S.length && (build(), show(cur)));
+
+// Charts
+function make(el) {
+  return LightweightCharts.createChart(el, {
+    autoSize: true,
+    layout: { background: { color: css('--bg') }, textColor: css('--muted'), fontFamily: "'Geist Mono', monospace", fontSize: 11 },
+    grid: { vertLines: { visible: false }, horzLines: { color: css('--soft') } },
+    rightPriceScale: { borderColor: css('--line') },
+    timeScale: { borderColor: css('--line'), timeVisible: true, tickMarkFormatter: (t, type) => (type < 3 ? etDay : etTime).format(new Date(t * 1000)) },
+    localization: { timeFormatter: fmt },
+    crosshair: { mode: 0 },
+  });
+}
+function candles(chart) {
+  return chart.addCandlestickSeries({
+    upColor: 'rgba(0,0,0,0)', borderUpColor: css('--up'), wickUpColor: css('--up'),
+    downColor: css('--down'), borderDownColor: css('--down'), wickDownColor: css('--down'),
+  });
+}
+let htf, ltf, htfS, ltfS;
+function build() {
+  charts.forEach(c => c.remove());
+  htf = make($('#htf')); ltf = make($('#ltf'));
+  charts = [htf, ltf];
+  htfS = candles(htf); ltfS = candles(ltf);
+  htfS.setData(DATA.htf);
+}
+function line(series, price, title, color, style) {
+  if (price == null) return;
+  lines.push([series, series.createPriceLine({ price, color, lineWidth: 1, lineStyle: style, axisLabelVisible: true, title })]);
+}
+
+function show(i) {
+  cur = i;
+  const s = S[i];
+  lines.forEach(([series, l]) => series.removePriceLine(l)); lines = [];
+  const bull = s.direction === 'bull';
+  const htfLen = s.c2_close - s.c2_ts;
+
+  // Higher timeframe: C1, C2, C3 markers, the swept level, the POI and EQ.
+  const idx = DATA.htf.findIndex(b => b.time === s.c2_ts);
+  htf.timeScale().setVisibleLogicalRange({ from: idx - 25, to: idx + 8 });
+  const m = [
+    { time: s.c1_ts, position: bull ? 'belowBar' : 'aboveBar', color: css('--muted'), shape: 'circle', text: 'C1' },
+    { time: s.c2_ts, position: bull ? 'belowBar' : 'aboveBar', color: css('--ink'), shape: bull ? 'arrowUp' : 'arrowDown', text: 'C2' },
+  ];
+  if (DATA.htf[idx + 1]) m.push({ time: DATA.htf[idx + 1].time, position: bull ? 'belowBar' : 'aboveBar', color: css('--muted'), shape: 'circle', text: 'C3' });
+  htfS.setMarkers(m);
+  line(htfS, bull ? s.c1_low : s.c1_high, bull ? 'C1 low' : 'C1 high', css('--muted'), 0);
+  line(htfS, s.poi_level, `POI ${s.poi_kind}`, css('--ink'), 2);
+  line(htfS, s.eq, 'EQ', s.eq_broken ? css('--down') : css('--muted'), 1);
+
+  // Lower timeframe: the CISD window.
+  const from = s.c2_ts - htfLen, to = s.c2_close + 2 * htfLen;
+  const sub = DATA.ltf.filter(b => b.time >= from && b.time <= to);
+  ltfS.setData(sub);
+  ltfS.setMarkers(s.cisd_ts ? [{ time: s.cisd_ts, position: bull ? 'belowBar' : 'aboveBar', color: css('--ink'), shape: bull ? 'arrowUp' : 'arrowDown', text: s.early ? 'CISD early' : 'CISD' }] : []);
+  ltf.timeScale().fitContent();
+  line(ltfS, bull ? s.c1_low : s.c1_high, 'swept level', css('--muted'), 0);
+  line(ltfS, s.cisd_level, 'CISD level', css('--ink'), 2);
+  line(ltfS, s.protected, bull ? 'protected low' : 'protected high', css('--down'), 2);
+  line(ltfS, s.eq, 'EQ', s.eq_broken ? css('--down') : css('--muted'), 1);
+  const note = $('#ltfNote');
+  note.hidden = !(s.ltf_missing || !sub.length || !s.cisd_ts);
+  note.textContent = s.ltf_missing || !sub.length
+    ? `No ${DATA.ltf_interval} bars this far back. Yahoo keeps 5m and 15m bars for 60 days; the collector adds more each day.`
+    : 'No CISD inside the window (C2 open to C3 close).';
+
+  $('#facts').innerHTML = [
+    ['C2', DATA.htf_interval === '1d' ? when(s) : fmt(s.c2_ts)], ['Direction', s.direction], ['POI', `${s.poi_kind} ${num(s.poi_level)}`],
+    ['C3 closed through', s.c3_closed == null ? 'pending' : s.c3_closed ? 'yes' : 'no'], ['Roll week', s.near_roll ? 'yes' : 'no'],
+  ].map(([k, v]) => `<span>${k} <b class="mono">${v}</b></span>`).join('');
+  $('#ltfFacts').innerHTML = s.cisd_ts ? [
+    ['CISD', fmt(s.cisd_ts)], ['Level', num(s.cisd_level)], ['Protected', num(s.protected)], ['EQ broken', s.eq_broken ? 'yes' : 'no'],
+  ].map(([k, v]) => `<span>${k} <b class="mono">${v}</b></span>`).join('') : '';
+
+  const v = verdicts[s.c2_ts] || {};
+  [...$('#verdict').children].forEach(b => b.setAttribute('aria-pressed', b.dataset.v === v.verdict));
+  $('#note').value = v.note || '';
+  document.querySelectorAll('.item').forEach(b => b.toggleAttribute('aria-current', +b.dataset.i === i));
+  document.querySelector(`.item[data-i="${i}"]`)?.scrollIntoView({ block: 'nearest' });
+}
+
+function renderList() {
+  $('#list').innerHTML = S.map((s, i) => {
+    const v = (verdicts[s.c2_ts] || {}).verdict || '';
+    const cisd = s.ltf_missing ? 'LTF missing' : s.cisd_ts ? 'CISD' : 'no CISD';
+    return `<button class="item" data-i="${i}"><span class="dot ${v}"></span><span class="mono">${when(s)}</span>
+      <span class="mono">${s.direction}</span><small>${s.poi_kind} · ${cisd}</small></button>`;
+  }).join('');
+  const done = S.filter(s => (verdicts[s.c2_ts] || {}).verdict).length;
+  $('#progress').textContent = `${done} / ${S.length} marked`;
+}
+$('#list').onclick = e => { const b = e.target.closest('.item'); if (b) show(+b.dataset.i); };
+
+function save(patch) {
+  const s = S[cur];
+  verdicts[s.c2_ts] = { ...(verdicts[s.c2_ts] || {}), ...patch };
+  store.set(KEY, verdicts);
+  renderList(); show(cur);
+}
+$('#verdict').onclick = e => e.target.dataset.v && save({ verdict: e.target.dataset.v });
+$('#note').oninput = e => { const s = S[cur]; verdicts[s.c2_ts] = { ...(verdicts[s.c2_ts] || {}), note: e.target.value }; store.set(KEY, verdicts); };
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'TEXTAREA' || !S.length) return;
+  if (e.key === 'j') show(Math.min(cur + 1, S.length - 1));
+  if (e.key === 'k') show(Math.max(cur - 1, 0));
+});
+$('#download').onclick = () => {
+  const out = S.map(s => ({ c2_ts: new Date(s.c2_ts * 1000).toISOString(), direction: s.direction, ...(verdicts[s.c2_ts] || {}) }))
+    .filter(r => r.verdict || r.note);
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' }));
+  a.download = `verdicts-${DATA.code}-${DATA.pairing}.json`;
+  a.click();
+};
+
+document.fonts.ready.then(() => {
+  const t = store.get('apollo-theme', 'auto');
+  [...$('#theme').children].forEach(b => b.setAttribute('aria-pressed', b.dataset.t === t));
+  if (t !== 'auto') document.documentElement.dataset.theme = t;
+  if (!S.length) { $('#main').innerHTML = '<p class="empty">No setups in this range.</p>'; return; }
+  renderList(); build(); show(S.length - 1);
+});
+</script>
+</body>
+</html>
