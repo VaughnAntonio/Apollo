@@ -9,3 +9,4 @@ data_store/
 node_modules/
 dist/
 .DS_Store
+*.egg-info/

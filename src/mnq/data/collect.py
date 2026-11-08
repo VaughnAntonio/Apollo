@@ -6,7 +6,7 @@ Run: python -m mnq.data.collect --root data_store --symbols all --intervals 1m,5
 import argparse
 import logging
 from collections.abc import Callable
-from datetime import date
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import cast
 
@@ -34,20 +34,19 @@ def collect(
     for sym in symbols.values():
         for interval in intervals:
             key = f"{sym.code}/{interval}"
+            written[key] = 0
             try:
                 df = fetch(sym, interval)
-            except Exception as e:  # noqa: BLE001 - any fetch error must skip only this pair
-                log.warning("%s: fetch failed: %s", key, e)
-                df = pl.DataFrame()
-            if df.is_empty():
-                log.warning("%s: no data", key)
-                written[key] = 0
-                continue
-            written[key] = append_bars(root, df, interval)
-            out_dir.mkdir(parents=True, exist_ok=True)
-            report = check_quality(df, interval, kind=sym.kind)
-            (out_dir / f"{sym.code}_{interval}.json").write_text(report.to_json())
-            log.info("%s: %d rows", key, written[key])
+                if df.is_empty():
+                    log.warning("%s: no data", key)
+                    continue
+                written[key] = append_bars(root, df, interval)
+                out_dir.mkdir(parents=True, exist_ok=True)
+                report = check_quality(df, interval, kind=sym.kind, now=datetime.now(UTC))
+                (out_dir / f"{sym.code}_{interval}.json").write_text(report.to_json())
+                log.info("%s: %d rows", key, written[key])
+            except Exception as e:  # noqa: BLE001 - any error must skip only this pair
+                log.warning("%s: failed: %s", key, e)
     return written
 
 

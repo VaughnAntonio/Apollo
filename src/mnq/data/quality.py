@@ -54,9 +54,15 @@ def _slots(start: datetime, end: datetime, step: timedelta, kind: str) -> list[d
 
 
 def check_quality(
-    df: pl.DataFrame, interval: Interval, kind: Literal["future", "stock"] = "future"
+    df: pl.DataFrame,
+    interval: Interval,
+    kind: Literal["future", "stock"] = "future",
+    now: datetime | None = None,
 ) -> QualityReport:
-    """Report duplicates, holes during trading hours, bad ticks and sparse days."""
+    """Report duplicates, holes during trading hours, bad ticks and sparse days.
+
+    Days that have not finished trading by `now` are not judged as sparse.
+    """
     df = df.sort("ts")
     sym = df["symbol"][0] if df.height else ""
     report = QualityReport(sym, interval, df.height, df.height - df["ts"].n_unique())
@@ -68,15 +74,17 @@ def check_quality(
         pl.col("high") - pl.col("low"), (pl.col("high") - prev).abs(), (pl.col("low") - prev).abs()
     )
     atr = tr.rolling_mean(14).shift(1)  # ATR of the bars before, so a spike can't hide itself
-    ticks = df.filter((pl.col("close") - prev).abs() > 8 * atr)["ts"]
+    step = timedelta(minutes=MINUTES[interval])
+    # The first bar after a closure may gap on news; only compare bars that follow on directly.
+    follows = (pl.col("ts") - pl.col("ts").shift(1)) <= step
+    ticks = df.filter(follows & ((pl.col("close") - prev).abs() > 8 * atr))["ts"]
     report.bad_ticks = [t.isoformat() for t in ticks]
 
     if interval == "1d":
         return report
-    step = timedelta(minutes=MINUTES[interval])
     ts = df["ts"].to_list()
     for a, b in pairwise(ts):
-        if b - a > 2 * step and _slots(a + step, b, step, kind):
+        if b - a > step and _slots(a + step, b, step, kind):
             report.gaps.append(((a + step).isoformat(), b.isoformat()))
 
     s = add_session_columns(df)
@@ -87,6 +95,8 @@ def check_quality(
         else:
             hi = datetime(d.year, d.month, d.day, 17, tzinfo=TZ)
             lo = hi - timedelta(hours=23)
+        if now is not None and hi > now:
+            continue
         expected = len(_slots(lo, hi, step, kind))
         if expected and n < 0.8 * expected:
             report.bad_days.append(d.isoformat())
