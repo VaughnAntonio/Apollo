@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mnq-predictor"
+version = "0.1.0"
+description = "Regime and range forecasts for a mechanical TTrades Fractal Model, with a trade journal."
+requires-python = ">=3.13"
+license = "MIT"
+dependencies = ["polars", "pyarrow", "yfinance", "pandas"]
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff", "pyright"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["network: hits Yahoo Finance"]
+addopts = "-m 'not network'"
+
+[tool.ruff]
+line-length = 100
+extend-exclude = ["docs", ".claude"]
+
+[tool.pyright]
+include = ["src", "tests"]
+
+

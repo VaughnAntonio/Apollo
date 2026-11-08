@@ -1,0 +1,14 @@
+Metadata-Version: 2.4
+Name: mnq-predictor
+Version: 0.1.0
+Summary: Regime and range forecasts for a mechanical TTrades Fractal Model, with a trade journal.
+License-Expression: MIT
+Requires-Python: >=3.13
+Requires-Dist: polars
+Requires-Dist: pyarrow
+Requires-Dist: yfinance
+Requires-Dist: pandas
+Provides-Extra: dev
+Requires-Dist: pytest; extra == "dev"
+Requires-Dist: ruff; extra == "dev"
+Requires-Dist: pyright; extra == "dev"

@@ -1,0 +1,9 @@
+polars
+pyarrow
+yfinance
+pandas
+
+[dev]
+pytest
+ruff
+pyright
