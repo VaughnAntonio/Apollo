@@ -2,7 +2,7 @@
 
 from datetime import timedelta
 from pathlib import Path
-from typing import Literal
+from typing import Literal, cast
 
 import polars as pl
 
@@ -11,7 +11,7 @@ from apollo.data.resample import to_4h
 from apollo.data.rolls import mark_roll_days
 from apollo.data.sessions import add_session_columns
 from apollo.data.store import read_bars
-from apollo.data.yahoo import bar_close
+from apollo.data.yahoo import Interval, bar_close
 from apollo.fractal.candles import detect_c2
 from apollo.fractal.cisd import find_cisd
 from apollo.fractal.config import load_fractal_config
@@ -68,10 +68,11 @@ def complete_4h(h1: pl.DataFrame) -> pl.DataFrame:
 def load_pair(root: Path, code: str, pairing: Pairing) -> tuple[pl.DataFrame, pl.DataFrame]:
     """Read the stored higher- and lower-timeframe bars for a pairing."""
     htf_i, ltf_i = PAIRINGS[pairing]
-    htf = (
-        complete_4h(read_bars(root, code, "1h")) if htf_i == "4h" else read_bars(root, code, htf_i)
-    )  # type: ignore[arg-type]
-    return htf, read_bars(root, code, ltf_i)  # type: ignore[arg-type]
+    if htf_i == "4h":
+        htf = complete_4h(read_bars(root, code, "1h"))
+    else:
+        htf = read_bars(root, code, cast(Interval, htf_i))
+    return htf, read_bars(root, code, cast(Interval, ltf_i))
 
 
 def run_model(
