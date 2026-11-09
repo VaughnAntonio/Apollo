@@ -145,6 +145,7 @@ function candles(chart) {
 let htf, ltf, htfS, ltfS;
 function build() {
   charts.forEach(c => c.remove());
+  lines = []; // their series went with the old charts
   htf = make($('#htf')); ltf = make($('#ltf'));
   charts = [htf, ltf];
   htfS = candles(htf); ltfS = candles(ltf);
