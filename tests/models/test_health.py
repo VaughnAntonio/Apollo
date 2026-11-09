@@ -44,3 +44,13 @@ def test_no_lookahead(synthetic_frames):
     keep = pl.col("date") <= day.date()
     assert base.filter(keep).equals(mod.filter(keep))
     assert not base.filter(~keep).equals(mod.filter(~keep))  # and later rows do see the change
+
+
+def test_gap_is_move_since_previous_session_close(synthetic_frames):
+    sess, h1, d1, sym = synthetic_frames
+    f = health_features(sess, h1, d1, sym)
+    i = sess.height - 5
+    at = sess["forecast_at"][i]
+    last = h1.filter(pl.col("ts") + timedelta(hours=1) <= at)["close"][-1]
+    expected = last / sess["close"][i - 1] - 1
+    assert f["gap"][i] == pytest.approx(expected)

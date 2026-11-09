@@ -96,13 +96,13 @@ def build_report(root: Path, code: str, now: datetime | None = None) -> dict:
 
     # The next session: final models fitted on every usable session.
     nxt = _next_session(now)
-    at = datetime.combine(nxt, time(9), tzinfo=NY).astimezone(UTC)
+    at = datetime.combine(nxt, time(8), tzinfo=NY).astimezone(UTC)  # the 08:00 ET cutoff
     ahead = pl.concat(
         [
-            sessions.select("date", "forecast_at", "label"),
+            sessions.select("date", "forecast_at", "label", "close"),
             pl.DataFrame(
-                {"date": [nxt], "forecast_at": [at], "label": [None]},
-                schema=sessions.select("date", "forecast_at", "label").schema,
+                {"date": [nxt], "forecast_at": [at], "label": [None], "close": [None]},
+                schema=sessions.select("date", "forecast_at", "label", "close").schema,
             ),
         ]
     )

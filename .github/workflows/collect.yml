@@ -39,11 +39,11 @@ jobs:
 
       - run: .venv/bin/python -m apollo.data.collect --root data_store
 
-      - name: Forecast the next session and score finished ones
+      - name: Score finished sessions in the ledger
         run: |
           for s in MNQ MES M2K MYM; do
             .venv/bin/python -m apollo.models.report --root data_store --symbol "$s" \
-              --write-ledger --score-ledger || echo "::warning::models report failed for $s"
+              --score-ledger || echo "::warning::scoring failed for $s"
           done
 
       - name: Commit and push new bars

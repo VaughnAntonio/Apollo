@@ -24,20 +24,27 @@ def test_no_forecast_after_session_start(tmp_path):
     assert not (tmp_path / "ledger").exists()
 
 
-def test_rewrite_same_day_is_identical(tmp_path):
-    early = datetime(2026, 11, 9, 18, 0, tzinfo=NY)
-    a = write_forecast(tmp_path, "MNQ", FORECAST_FOR_NOV_10, early)
+def test_no_forecast_before_the_cutoff(tmp_path):
+    night_before = datetime(2026, 11, 9, 18, 0, tzinfo=NY)
+    assert write_forecast(tmp_path, "MNQ", FORECAST_FOR_NOV_10, night_before) is None
+
+
+def test_existing_forecast_is_never_overwritten(tmp_path):
+    a = write_forecast(
+        tmp_path, "MNQ", FORECAST_FOR_NOV_10, datetime(2026, 11, 10, 8, 10, tzinfo=NY)
+    )
     assert a is not None and a == tmp_path / "ledger" / "MNQ" / "2026-11-10.json"
     first = a.read_text()
-    write_forecast(tmp_path, "MNQ", FORECAST_FOR_NOV_10, early)
-    assert a.read_text() == first
+    changed = {**FORECAST_FOR_NOV_10, "up_bound": 999.0}
+    later = datetime(2026, 11, 10, 8, 40, tzinfo=NY)
+    assert write_forecast(tmp_path, "MNQ", changed, later) is None and a.read_text() == first
 
 
 def test_score_marks_hits_once(tmp_path):
-    early = datetime(2026, 11, 2, 18, 0, tzinfo=NY)
     for d in ("2026-11-03", "2026-11-04"):
         f = {**FORECAST_FOR_NOV_10, "date": d, "up_bound": 5.0, "down_bound": 5.0}
-        write_forecast(tmp_path, "MNQ", f, early)
+        when = datetime.fromisoformat(f"{d}T08:15").replace(tzinfo=NY)
+        assert write_forecast(tmp_path, "MNQ", f, when) is not None
     sessions = pl.DataFrame(
         {
             "date": [date(2026, 11, 3), date(2026, 11, 4)],

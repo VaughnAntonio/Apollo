@@ -25,3 +25,23 @@ def test_roll_jump_zeroed(bars):
 def test_no_flag_outside_window_or_for_none_rule(bars, start, code):
     out = clean_returns(_jumped(bars, start, code), SYMS[code])
     assert out["roll_jump"].sum() == 0 and float(out["ret"].abs().max()) > 0.5  # type: ignore[arg-type]
+
+
+def test_real_news_move_is_not_a_roll_jump(bars):
+    # Inside the roll window, the largest move is only a little bigger than the next one.
+    h = bars("2026-03-12 09:00", 200, "1h")
+    moves = pl.int_range(pl.len())
+    close = (
+        pl.when(moves == 50)
+        .then(pl.col("close") * 0.97)
+        .when(moves == 120)
+        .then(pl.col("close") * 0.975)
+    )
+    h = h.with_columns(close.otherwise(pl.col("close")).alias("close"))
+    assert clean_returns(h, SYMS["MNQ"])["roll_jump"].sum() == 0
+
+
+def test_window_still_open_is_checked(bars):
+    # The live run sits inside a roll window whose expiry hasn't passed yet.
+    out = clean_returns(_jumped(bars, "2026-03-12 09:00").head(150), SYMS["MNQ"])
+    assert out["roll_jump"].sum() == 1

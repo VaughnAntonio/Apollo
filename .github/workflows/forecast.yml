@@ -1,0 +1,57 @@
+name: Pre-open forecast
+
+# 08:15 ET is 12:15 UTC in summer and 13:15 UTC in winter. Both run; the ledger only accepts a
+# forecast between 08:00 and 09:00 ET, so the run outside that hour writes nothing.
+on:
+  schedule:
+    - cron: "15 12 * * 1-5"
+    - cron: "15 13 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: collect
+  cancel-in-progress: false
+
+jobs:
+  forecast:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check out the data branch into data_store/
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch --depth 1 origin data
+          git worktree add data_store origin/data
+          git -C data_store switch -c data
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - run: python -m venv .venv && .venv/bin/pip install -e .
+
+      - name: Fetch the bars up to the 08:00 ET cutoff
+        run: .venv/bin/python -m apollo.data.collect --root data_store --symbols MNQ,MES,M2K,MYM --intervals 1h,1d
+
+      - name: Write today's forecasts to the ledger
+        run: |
+          for s in MNQ MES M2K MYM; do
+            .venv/bin/python -m apollo.models.report --root data_store --symbol "$s" \
+              --write-ledger || echo "::warning::forecast failed for $s"
+          done
+
+      - name: Commit and push the ledger
+        working-directory: data_store
+        run: |
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Nothing new (outside the 08:00-09:00 ET window, or already written)."
+          else
+            git commit -m "forecast: $(date -u +%F)"
+            git push origin data
+          fi

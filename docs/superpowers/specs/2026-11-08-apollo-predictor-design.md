@@ -210,7 +210,13 @@ Reference mockup:
     session.
 - **Target:** the **New York session** label (that's where the trades
   happen).
-  - The forecast is made **before the open**, using data up to 09:00 ET.
+  - The forecast is made **before the open**, from bars closed by **08:00 ET**.
+    A pre-open job at 08:15 ET writes it to the ledger, so the live forecast
+    sees exactly the bars the backtest used. *(Changed 2026-11-09 after the
+    Plan 3 review: a 17:30 ET nightly forecast saw different data than the
+    backtest.)*
+  - v1 session = 09:00–16:00 ET, from hourly bars (09:30 isn't available on
+    the 2-year hourly history).
   - v1 has no intraday re-forecast. If one is added later, it gets its own
     cut-off and is scored separately. *(Builder's call.)*
 - **Training history** *(builder's call)*:

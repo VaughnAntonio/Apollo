@@ -2,6 +2,9 @@
 
 v1 session: 09:00 to 16:00 ET, the seven hourly bars that open 09:00 to 15:00. Yahoo's hourly
 bars sit on the hour, so 09:30 is not available over the two-year history.
+
+The forecast is made at 08:00 ET from bars closed by then. A job that runs at 08:15 ET can see the
+same bars, so the live forecast and the backtest use identical inputs.
 """
 
 import polars as pl
@@ -44,11 +47,11 @@ def build_sessions(h1: pl.DataFrame, sym: Symbol) -> pl.DataFrame:
         .then(pl.lit("chop"))
         .otherwise(pl.lit("normal"))
     )
-    nine_et = (pl.col("date").cast(pl.Datetime("us")) + pl.duration(hours=9)).dt.replace_time_zone(
+    cutoff = (pl.col("date").cast(pl.Datetime("us")) + pl.duration(hours=8)).dt.replace_time_zone(
         "America/New_York"
     )
     return s.with_columns(
-        forecast_at=nine_et.dt.convert_time_zone("UTC"),
+        forecast_at=cutoff.dt.convert_time_zone("UTC"),
         body_ratio=ratio,
         label=label,
         up_exc=pl.col("high") - pl.col("open"),

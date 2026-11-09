@@ -1,9 +1,12 @@
 """Hourly log returns with the contract-roll jump removed.
 
 Yahoo's continuous `=F` series switches to the next contract once a quarter, which shows up as
-one large fake return. Inside each roll window, the single largest move is treated as that jump
-when it is more than five times the window's median move, and set to zero.
+one large fake return. Inside each roll window, the largest move is treated as that jump only
+when it dwarfs everything else: more than five times the median move and three times the next
+largest. A big news move (an FOMC day, say) is close to its runner-up, so it is left alone.
 """
+
+from datetime import timedelta
 
 import polars as pl
 
@@ -11,6 +14,7 @@ from apollo.config import Symbol
 from apollo.data.rolls import roll_windows
 
 JUMP_MULTIPLE = 5
+RUNNER_UP_MULTIPLE = 3
 
 
 def clean_returns(h1: pl.DataFrame, sym: Symbol) -> pl.DataFrame:
@@ -21,14 +25,17 @@ def clean_returns(h1: pl.DataFrame, sym: Symbol) -> pl.DataFrame:
     )
     if sym.roll_rule == "none" or df.is_empty():
         return df.drop("et_date")
-    for lo, hi in roll_windows(df["et_date"].min(), df["et_date"].max()):  # type: ignore[arg-type]
+    first, last = df["et_date"].min(), df["et_date"].max()
+    # Look 8 days past the data so a window whose expiry hasn't arrived yet is still checked.
+    for lo, hi in roll_windows(first, last + timedelta(days=8)):  # type: ignore[arg-type, operator]
         inside = pl.col("et_date").is_between(lo, hi)
         window = df.filter(inside)
         if window.height < 2:
             continue
         size = window["ret"].abs()
-        biggest = size.max()
-        if biggest > JUMP_MULTIPLE * size.median():  # type: ignore[operator]
+        top = size.sort(descending=True)
+        biggest, runner_up = top[0], top[1]
+        if biggest > JUMP_MULTIPLE * size.median() and biggest > RUNNER_UP_MULTIPLE * runner_up:  # type: ignore[operator]
             at = window["ts"][int(size.arg_max() or 0)]
             df = df.with_columns(roll_jump=pl.col("roll_jump") | (pl.col("ts") == at))
     return df.with_columns(

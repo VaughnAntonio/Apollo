@@ -18,11 +18,21 @@ def _path(root: Path, code: str, day: str) -> Path:
 
 
 def write_forecast(root: Path, code: str, forecast: dict, now: datetime) -> Path | None:
-    """Write the forecast for forecast["date"], unless that session has already started."""
-    day = forecast["date"]
-    if now >= datetime.combine(date.fromisoformat(day), time(9), tzinfo=NY):
+    """Write the forecast for forecast["date"] once, between its 08:00 ET cutoff and 09:00 ET.
+
+    Before 08:00 the cutoff bars don't exist yet; from 09:00 the session is under way. An entry
+    that already exists is never overwritten, so a re-run can't replace a forecast.
+    """
+    day = date.fromisoformat(forecast["date"])
+    if (
+        not datetime.combine(day, time(8), tzinfo=NY)
+        <= now
+        < datetime.combine(day, time(9), tzinfo=NY)
+    ):
         return None
-    path = _path(root, code, day)
+    path = _path(root, code, forecast["date"])
+    if path.exists():
+        return None
     path.parent.mkdir(parents=True, exist_ok=True)
     entry = {**forecast, "written_at": now.astimezone(UTC).isoformat(timespec="seconds")}
     path.write_text(json.dumps(entry, indent=2, sort_keys=True))

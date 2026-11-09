@@ -19,7 +19,7 @@ def test_trend_up_session(ohlc):
     s = build_sessions(ohlc(rows, "2026-11-03 09:00", "1h"), MNQ).row(0, named=True)
     assert (s["open"], s["high"], s["low"], s["close"]) == (100.0, 107.0, 99.5, 106.9)
     assert s["label"] == "trend_up" and s["up_exc"] == 7.0 and s["down_exc"] == 0.5
-    assert str(s["forecast_at"]) == "2026-11-03 14:00:00+00:00" and s["bars"] == 7
+    assert str(s["forecast_at"]) == "2026-11-03 13:00:00+00:00" and s["bars"] == 7  # 08:00 EST
 
 
 @pytest.mark.parametrize(
@@ -43,9 +43,9 @@ def test_short_session_unlabelled(ohlc):
     assert s["bars"][0] == 4 and s["label"][0] is None
 
 
-def test_forecast_time_is_nine_even_without_the_nine_bar(ohlc):
+def test_forecast_time_is_eight_even_without_early_bars(ohlc):
     s = build_sessions(ohlc([(100, 101, 99, 100.5)] * 3, "2026-11-27 10:00", "1h"), MNQ)
-    assert str(s["forecast_at"][0]) == "2026-11-27 14:00:00+00:00"
+    assert str(s["forecast_at"][0]) == "2026-11-27 13:00:00+00:00"
 
 
 def test_overnight_bars_ignored(ohlc):

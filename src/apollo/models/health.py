@@ -99,13 +99,14 @@ def health_features(
     """One feature row per session, from bars that closed by its 09:00 ET forecast time."""
     cr = clean_returns(h1, sym)
     close_ts = cr["ts"].dt.epoch("us").to_numpy() + 3_600_000_000  # an hourly bar closes 1h later
-    open_ts = cr["ts"].dt.epoch("us").to_numpy()
-    ret, opn = cr["ret"].to_numpy(), cr["open"].to_numpy()
+    ret = cr["ret"].to_numpy()
     hi, lo, cl = cr["high"].to_numpy(), cr["low"].to_numpy(), cr["close"].to_numpy()
     days, ma50, atr = _daily_context(d1, sym)
 
-    rows, prev = [], None
-    for date, at, label in sessions.select("date", "forecast_at", "label").iter_rows():
+    rows, prev, prev_close = [], None, None
+    for date, at, label, close in sessions.select(
+        "date", "forecast_at", "label", "close"
+    ).iter_rows():
         t = int(at.timestamp() * 1_000_000)
         cut = int(np.searchsorted(close_ts, t, side="right"))  # bars [0, cut) closed by 09:00
         row: dict[str, object] = {"date": date, **dict.fromkeys(FEATURES)}
@@ -114,9 +115,8 @@ def health_features(
             row["rng_24h"] = float(
                 np.mean((hi[cut - 24 : cut] - lo[cut - 24 : cut]) / cl[cut - 24 : cut])
             )
-            nine = int(np.searchsorted(open_ts, t))
-            if nine < len(open_ts) and open_ts[nine] == t:
-                row["gap"] = float(opn[nine] / cl[cut - 1] - 1)
+            if prev_close:  # overnight move so far: the cutoff price vs the last session's close
+                row["gap"] = float(cl[cut - 1] / prev_close - 1)
         k = int(np.searchsorted(days, np.datetime64(date), side="left"))  # daily bars before D
         if k >= 1:
             row["d_ma50"] = None if np.isnan(ma50[k - 1]) else float(ma50[k - 1])
@@ -124,6 +124,6 @@ def health_features(
         for lab in LABELS:
             row[f"prev_label_{lab}"] = 1.0 if prev == lab else 0.0
         rows.append(row)
-        prev = label
+        prev, prev_close = label, close
     schema = {"date": pl.Date, **dict.fromkeys(FEATURES, pl.Float64)}
     return pl.DataFrame(rows, schema=schema)
