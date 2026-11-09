@@ -24,10 +24,21 @@ COLUMNS = (
 
 
 def _commit() -> str:
-    """The checked-out commit, marked "-dirty" when the code that ran has uncommitted changes."""
+    """The checked-out commit, marked "-dirty" when code or config has uncommitted changes.
+
+    Logs and reports are left out of the check: the log file itself changes on every run.
+    """
     try:
-        cmd = ["git", "describe", "--always", "--dirty"]
-        return subprocess.run(cmd, capture_output=True, text=True, check=True).stdout.strip()
+        sha = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True, check=True
+        )
+        status = subprocess.run(
+            ["git", "status", "--porcelain", "--", "src", "config"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return sha.stdout.strip() + ("-dirty" if status.stdout.strip() else "")
     except (OSError, subprocess.CalledProcessError):
         return "unknown"
 
