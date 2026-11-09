@@ -10,7 +10,7 @@ requires-python = ">=3.13"
 license = "MIT"
 dependencies = ["polars", "pyarrow", "yfinance", "pandas", "numpy", "scipy", "scikit-learn", "mapie",
     "openbb-core==2.0.1", "openbb-index==2.0.0", "openbb-economy==2.0.0", "openbb-cboe==2.0.0", "openbb-nasdaq==2.0.0",
-    "openbb-federal-reserve==2.0.0", "certifi",
+    "openbb-federal-reserve==2.0.0", "certifi", "quantstats",
 ]
 
 [project.optional-dependencies]

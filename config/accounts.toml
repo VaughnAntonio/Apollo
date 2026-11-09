@@ -1,0 +1,16 @@
+# Prop-firm account presets. lock = profit above the start where the trailing threshold stops
+# rising (APEX locks at +100, TOPSTEP at the starting balance). Check against your dashboards.
+
+[[account]]
+name = "APEX 50k"
+size = 50000
+drawdown = 2500
+lock = 100
+profit_target = 3000
+
+[[account]]
+name = "TOPSTEP 50k"
+size = 50000
+drawdown = 2000
+lock = 0
+profit_target = 3000

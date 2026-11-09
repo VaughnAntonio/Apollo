@@ -5,3 +5,43 @@ sweep_ticks = 1        # C2 must trade this many ticks beyond C1's high or low
 poi_lookback = 20      # how many higher-timeframe bars back to look for swings and gaps
 poi_kinds = ["swing", "fvg"]
 outside_bar = "skip"   # a bar that sweeps both sides of C1 has no clear direction
+
+# Trading rules (spec 5.6-5.7). Variants switch filters and the risk-review rules on and off.
+
+[trade]
+account = "APEX 50k"       # a name from config/accounts.toml
+risk_pct = 0.01            # 1% of account size per trade
+min_rr = 1.5               # skip a trade below this reward:risk
+max_trades = 2             # per session
+stop_ticks_beyond = 1      # stop sits this many ticks beyond the protected level
+flat_at = "16:00"          # ET
+range_room = 0.10          # range filter: uncapped target may sit at most 10% of zone width past the edge
+
+[trade.windows]            # when an entry fill may happen, ET
+"D-1H" = ["09:00", "15:00"]
+"1H-5m" = ["09:30", "12:00"]
+
+[costs]
+commission = { micro = 0.62, emini = 2.25 }   # $ per contract per side
+slip_ticks = 1                                # per side
+
+[risk]                      # proposed rules 1-6 from docs/reviews/risk-rules-review.md
+daily_cap_r = 2.0           # 1: no new trades after -2R realised in a session
+cushion_frac = 0.25         # 2: skip if planned loss > 25% of the cushion above the threshold
+step_down_pct = 0.005       # 3: 0.5% risk while the cushion is below half the drawdown limit
+min_stop_ticks = 4          # 6: minimum stop
+max_stop_zone_frac = 0.5    # 5: skip if the stop is wider than half the forecast zone
+
+[backtest]
+holdout_months = 3          # Vaughn's choice, 2026-11-09
+
+[variants]                  # regime, range, risk_rules, breakeven, fomc_cutoff, event_half
+plain = [false, false, false, false, false, false]
+regime = [true, false, false, false, false, false]
+range = [false, true, false, false, false, false]
+both = [true, true, false, false, false, false]
+"plain+risk" = [false, false, true, false, false, false]
+"both+risk" = [true, true, true, false, false, false]
+"both+risk+be" = [true, true, true, true, false, false]
+"both+risk+fomc" = [true, true, true, false, true, false]
+"both+risk+event" = [true, true, true, false, false, true]

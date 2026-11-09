@@ -131,6 +131,9 @@ def build_report(
             {
                 "date": r["date"].isoformat(),
                 "label": r["label"],
+                "open": r["open"],
+                "ev_fomc": r["ev_fomc"],
+                "ev_any": r["ev_any"],
                 "proba": dict(zip(LABELS, map(float, probs[chosen][i]), strict=True)),
                 "up_bound": r["up_bound"],
                 "down_bound": r["down_bound"],
@@ -194,6 +197,25 @@ def build_report(
         "latest": latest,
         "_sessions_frame": sessions,
     }
+
+
+def forecast_frame(root: Path, code: str, feature_set: FeatureSet = "both") -> pl.DataFrame:
+    """Out-of-sample forecasts per session, for the strategy's filters (Plan 4)."""
+    rows = build_report(root, code, feature_set=feature_set)["sessions"]
+    return pl.DataFrame(
+        [
+            {
+                "date": date.fromisoformat(r["date"]),
+                "open": r["open"],
+                **{f"p_{k}": v for k, v in r["proba"].items()},
+                "up_bound": r["up_bound"],
+                "down_bound": r["down_bound"],
+                "ev_fomc": r["ev_fomc"],
+                "ev_any": r["ev_any"],
+            }
+            for r in rows
+        ]
+    )
 
 
 def _log_row(report: dict) -> dict:
