@@ -39,7 +39,7 @@ def _last_attempt(path: Path) -> int:
     return max((int(r["attempt"]) for r in rows), default=0)
 
 
-def append_run(path: Path, row: dict) -> int:
+def append_run(path: Path, row: dict, columns: tuple[str, ...] = COLUMNS) -> int:
     """Append one run and return its attempt number. Every logged run counts, repeats included."""
     path.parent.mkdir(parents=True, exist_ok=True)
     attempt = _last_attempt(path) + 1
@@ -51,9 +51,9 @@ def append_run(path: Path, row: dict) -> int:
     }
     text = path.read_text() if path.exists() else ""
     if not text.strip():
-        text = ",".join(COLUMNS) + "\n"
+        text = ",".join(columns) + "\n"
     text = text.rstrip("\n") + "\n"  # drop stray blank lines; make sure the last row ends cleanly
     out = io.StringIO()
-    csv.DictWriter(out, fieldnames=COLUMNS, extrasaction="ignore").writerow(full)
+    csv.DictWriter(out, fieldnames=columns, extrasaction="ignore").writerow(full)
     path.write_text(text + out.getvalue())
     return attempt

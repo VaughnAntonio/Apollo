@@ -2,6 +2,11 @@
 
 Only the CISD that confirms after C2 has closed is traded; the fill is the open of the next
 lower-timeframe bar, which is what a live order would get.
+
+On the Daily -> 1H layer most CISDs confirm as the daily C2 closes at 17:00 ET, outside the New
+York session. Those are entered at the next session open instead, the way a day trader would
+take them, as long as price hasn't reached the stop or the target in between and the setup's C3
+day is still running (its window_end).
 """
 
 from datetime import time
@@ -19,6 +24,7 @@ FOMC_CUTOFF = time(13, 30)
 SKIP_REASONS = (
     "no_cisd",
     "outside_window",
+    "invalidated",
     "no_forecast",
     "regime",
     "range_room",
@@ -68,7 +74,8 @@ def build_candidates(
     bars = ltf.sort("ts")
     bar_ts = bars["ts"].to_list()
     stamps = np.array([t.timestamp() for t in bar_ts])
-    opens = bars["open"].to_list()
+    opens, highs, lows = bars["open"].to_list(), bars["high"].to_list(), bars["low"].to_list()
+    can_defer = layer == "D-1H" and "window_end" in setups.columns
     fc: dict[Any, dict[str, Any]] = {r["date"]: r for r in forecasts.iter_rows(named=True)}
     win_lo, win_hi = cfg.windows[layer]
     tick = sym.tick_size
@@ -92,13 +99,34 @@ def build_candidates(
         if k >= len(bar_ts):
             rows.append(row | {"skip": "outside_window"})
             continue
+
+        def in_window(j: int) -> bool:
+            t = bar_ts[j].astimezone(NY)
+            return t.weekday() < 5 and win_lo <= t.time() < win_hi
+
+        same_day = bar_ts[k].astimezone(NY).date() == sig.astimezone(NY).date()
+        if not (same_day and in_window(k)):
+            j = next((j for j in range(k, len(bar_ts)) if in_window(j)), None)
+            limit = s.get("window_end") if can_defer else None
+            if j is None or limit is None or bar_ts[j] >= limit:
+                rows.append(row | {"skip": "outside_window"})
+                continue
+            # deferred to the next session open: still valid only if nothing was hit meanwhile
+            stop0 = s["after_c2_protected"] - (1 if bull else -1) * cfg.stop_ticks_beyond * tick
+            target0 = s["c1_high"] if bull else s["c1_low"]
+            hit = any(
+                (lows[i] <= stop0 or highs[i] >= target0)
+                if bull
+                else (highs[i] >= stop0 or lows[i] <= target0)
+                for i in range(k, j)
+            )
+            if hit:
+                rows.append(row | {"entry_ts": bar_ts[j], "skip": "invalidated"})
+                continue
+            k = j
         entry_ts, entry = bar_ts[k], opens[k]
         local = entry_ts.astimezone(NY)
-        same_day = local.date() == sig.astimezone(NY).date()
         row |= {"entry_ts": entry_ts, "entry": entry, "session": local.date()}
-        if not (same_day and local.weekday() < 5 and win_lo <= local.time() < win_hi):
-            rows.append(row | {"skip": "outside_window"})
-            continue
 
         f: dict[str, Any] | None = fc.get(local.date())
         zone = _zone(f)

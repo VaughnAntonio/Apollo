@@ -108,3 +108,46 @@ def test_event_half_size(ohlc):
     f = forecasts(up=20, down=20, fomc=1.0)
     assert one(ohlc, setup(), f, "both+risk+event")["half_size"] is True
     assert one(ohlc, setup(), f, "both+risk")["half_size"] is False
+
+
+def deferred_setup(signal: datetime, window_end: datetime):
+    s = setup().with_columns(
+        after_c2_cisd_ts=pl.lit(signal).cast(TS), window_end=pl.lit(window_end).cast(TS)
+    )
+    return s
+
+
+def two_sessions(ohlc, overnight_low=101.0, overnight_high=103.0):
+    """16:00 ET on Nov 3, the Globex evening and night, then Nov 4 09:00-15:00 (opens at 102)."""
+    evening = ohlc([(102, 102.5, 101.5, 102)] * 1, "2026-11-03 16:00", "1h")
+    night = ohlc(
+        [(102, overnight_high, overnight_low, 102)] * 15, "2026-11-03 18:00", "1h"
+    )  # 18:00-08:00
+    day = ohlc([(102, 103, 101.5, 102.5)] * 7, "2026-11-04 09:00", "1h")
+    return pl.concat([evening, night, day])
+
+
+def test_overnight_cisd_enters_at_next_session_open(ohlc):
+    sig = datetime(2026, 11, 3, 16, tzinfo=NY)  # confirms as C2 closes at 17:00
+    s = deferred_setup(sig, datetime(2026, 11, 4, 17, tzinfo=NY))
+    c = build_candidates(s, two_sessions(ohlc), NONE, MNQ, CFG, V["plain"], "D-1H").row(
+        0, named=True
+    )
+    assert c["skip"] is None and str(c["entry_ts"]) == "2026-11-04 14:00:00+00:00"  # 09:00 ET
+    assert c["session"] == date(2026, 11, 4) and c["entry"] == 102.0
+
+
+def test_overnight_touch_of_stop_invalidates(ohlc):
+    sig = datetime(2026, 11, 3, 16, tzinfo=NY)
+    s = deferred_setup(sig, datetime(2026, 11, 4, 17, tzinfo=NY))
+    bars = two_sessions(ohlc, overnight_low=99.5)  # trades through the 99.75 stop overnight
+    assert build_candidates(s, bars, NONE, MNQ, CFG, V["plain"], "D-1H")["skip"][0] == "invalidated"
+
+
+def test_no_deferral_past_the_setup_window(ohlc):
+    sig = datetime(2026, 11, 3, 16, tzinfo=NY)
+    s = deferred_setup(sig, datetime(2026, 11, 3, 17, tzinfo=NY))  # C3 already over at 17:00
+    assert (
+        build_candidates(s, two_sessions(ohlc), NONE, MNQ, CFG, V["plain"], "D-1H")["skip"][0]
+        == "outside_window"
+    )
