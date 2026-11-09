@@ -237,6 +237,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--symbol", default="MNQ")
     p.add_argument("--features", default="both", choices=list(FEATURE_SETS))
     p.add_argument("--ablation", action="store_true", help="run health, context and both")
+    p.add_argument("--log", action="store_true", help="record this run in runs/log.csv")
     p.add_argument("--write-ledger", action="store_true")
     p.add_argument("--score-ledger", action="store_true")
     a = p.parse_args(argv)
@@ -250,7 +251,8 @@ def main(argv: list[str] | None = None) -> int:
         except ValueError as e:  # not enough data for this symbol yet
             print(f"skipped: {e}")
             return 1
-        attempt = append_run(RUN_LOG, _log_row(report))
+        # Research runs count as attempts; routine nightly scoring and forecasting don't.
+        attempt = append_run(RUN_LOG, _log_row(report)) if (a.ablation or a.log) else 0
         _print(report, attempt)
         reports[fs] = report
 

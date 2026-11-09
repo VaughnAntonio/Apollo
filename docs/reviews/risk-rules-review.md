@@ -65,9 +65,12 @@ you right. In the journal, 16 of 18 losing trades were cut by −1R and winners 
 
 ## Event days (OpenBB context)
 
-Plan 3b found the range model holds 93.6% of sessions on scheduled-release days. FOMC decisions
-land at 14:00 ET, inside the trading session, and CPI and payrolls come out at 08:30 ET, before
-the 09:30 entry window opens.
+Plan 3b's ablation (run log attempts 4–6) found the range zone holds on scheduled-release days
+about as well as on other days: 89.6% with price features only, 91.7% with OpenBB context added.
+In this sample, ranges on release days were only about 1% wider (1,075 vs 1,060 points). So the
+event rules below are hypotheses, not lessons the data has already taught. FOMC decisions land
+at 14:00 ET, inside the trading session; CPI and payrolls come out at 08:30 ET, before the 09:30
+entry window opens.
 
 - **Test in Plan 4:** "no new trades from 13:30 ET on FOMC days" and "half size on any
   high-impact day", both against the plain rule, out of sample.
@@ -84,7 +87,7 @@ the 09:30 entry window opens.
 | 6 | Tight stop | Allowed | Minimum stop of 4 ticks | Turtle | Avoids huge contract counts | Proposed |
 | 7 | Breakeven stop | None | Backtest as a variant only | Livermore | Winners ran +6.2R on average | Test in Plan 4 |
 | 8 | FOMC afternoon | No rule | Backtest "no new trades after 13:30 ET on FOMC days" | PTJ | FOMC lands mid-session | Test in Plan 4 |
-| 9 | Event-day size | No rule | Backtest half size on high-impact days | Turtle | Event days are where ranges widen | Test in Plan 4 |
+| 9 | Event-day size | No rule | Backtest half size on high-impact days | Turtle | Untested; ranges only ~1% wider on release days so far | Test in Plan 4 |
 
 Rules 1–6 change what Apollo's backtest is allowed to do. Rules 7–9 are hypotheses for the
 backtest to settle, and each one counts as an attempt in `runs/log.csv`.

@@ -5,11 +5,18 @@ Nasdaq lists every US event one day late and mixes ET and CT times, so release d
 the listed date minus one day, and listed times are ignored.
 """
 
+import logging
 import os
+import tomllib
 from datetime import date, timedelta
+from pathlib import Path
 from typing import Any
 
 import polars as pl
+
+from apollo.config import CONFIG_DIR
+
+log = logging.getLogger(__name__)
 
 EVENT_KINDS: dict[str, tuple[str, ...]] = {
     "fomc": ("Fed Interest Rate Decision",),
@@ -60,25 +67,21 @@ def _chunk(df) -> pl.DataFrame:
     )
 
 
-def _first_friday(year: int, month: int) -> date:
-    first = date(year, month, 1)
-    return first + timedelta(days=(4 - first.weekday()) % 7)
+def payroll_dates(path: Path = CONFIG_DIR / "payrolls.toml") -> list[date]:
+    """Official BLS Employment Situation release dates, kept in config/payrolls.toml."""
+    return [date.fromisoformat(d) for d in tomllib.loads(path.read_text())["dates"]]
 
 
 def with_payrolls(events: pl.DataFrame, start: date, end: date) -> pl.DataFrame:
-    """Add a payrolls date for every month in [start, end].
+    """Replace Nasdaq's payrolls rows with the BLS schedule.
 
-    Nasdaq lists the headline payrolls release only a few times a year, so each month defaults to
-    the BLS rule (first Friday). A date Nasdaq does list for that month replaces the rule's date,
-    which covers holiday moves such as 2025-07-03.
+    Nasdaq lists the headline release only a few times a year, and no simple rule gets the dates
+    right (2024-03-08, 2025-01-10 and 2026-01-09 are not first Fridays; October 2025 had none).
     """
-    listed = {(d.year, d.month): d for d in events.filter(pl.col("kind") == "nfp")["date"]}
-    rows, y, m = [], start.year, start.month
-    while (y, m) <= (end.year, end.month):
-        d = listed.get((y, m), _first_friday(y, m))
-        if start <= d <= end:
-            rows.append((d, "nfp", "Nonfarm Payrolls"))
-        y, m = (y + 1, 1) if m == 12 else (y, m + 1)
+    table = payroll_dates()
+    if end > table[-1]:
+        log.warning("config/payrolls.toml ends %s; add the next BLS dates", table[-1])
+    rows = [(d, "nfp", "Nonfarm Payrolls") for d in table if start <= d <= end]
     nfp = pl.DataFrame(rows, schema=events.schema, orient="row")
     return pl.concat([events.filter(pl.col("kind") != "nfp"), nfp]).sort("date", "kind")
 

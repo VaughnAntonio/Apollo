@@ -33,14 +33,23 @@ def collect_context(
     vol_path, ev_path = out / "vol.parquet", out / "events.parquet"
 
     try:
-        fetch_vol(VOL_START).write_parquet(vol_path)
+        vol = fetch_vol(VOL_START)
+        if vol_path.exists() and vol.height < pl.read_parquet(vol_path).height:
+            raise ValueError(f"short response ({vol.height} rows); keeping the longer cache")
+        vol.write_parquet(vol_path)
     except Exception as e:  # noqa: BLE001 - an outage must keep yesterday's file
         log.warning("vol: kept cached file: %s", e)
 
     try:
-        start = today - WINDOW if ev_path.exists() else EVENTS_START
-        new = fetch_events(start, today + WINDOW)
-        merged = pl.concat([pl.read_parquet(ev_path), new]) if ev_path.exists() else new
+        start, end = (today - WINDOW if ev_path.exists() else EVENTS_START), today + WINDOW
+        new = fetch_events(start, end)
+        # The fresh fetch is the truth for its window, so moved or cancelled releases drop out.
+        kept = (
+            pl.read_parquet(ev_path).filter(~pl.col("date").is_between(start, end))
+            if ev_path.exists()
+            else None
+        )
+        merged = new if kept is None else pl.concat([kept, new])
         merged.unique(["date", "kind"], keep="last").sort("date", "kind").write_parquet(ev_path)
     except Exception as e:  # noqa: BLE001
         log.warning("events: kept cached file: %s", e)

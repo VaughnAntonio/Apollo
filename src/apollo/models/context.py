@@ -1,7 +1,9 @@
 """Point-in-time market context per session (spec 5.14).
 
-Volatility comes from the last close dated before the session. Releases count on the day they
-are scheduled, which is public well ahead of time.
+Volatility comes from the last close dated before the session, and only if it is at most a few
+days old: an outage must show up as "unknown", not as a stale value. Releases count on the day
+they are scheduled, which is public well ahead of time; dates outside the cached calendar are
+unknown rather than "no event".
 """
 
 import polars as pl
@@ -34,6 +36,7 @@ def context_features(
         left_on="date",
         right_on="usable",
         strategy="backward",
+        tolerance="4d",  # a Friday close serves a Monday or a holiday Tuesday, nothing older
     )
     flags = events.select("date", "kind").unique().with_columns(hit=pl.lit(1.0))
     wide = (
@@ -51,4 +54,10 @@ def context_features(
             .alias(col)
         )
     out = out.with_columns(ev_any=pl.max_horizontal(*(f"ev_{k}" for k in KINDS)))
+    flags_cols = [f"ev_{k}" for k in KINDS] + ["ev_any"]
+    if events.is_empty():
+        covered = pl.lit(False)
+    else:
+        covered = pl.col("date").is_between(events["date"].min(), events["date"].max())
+    out = out.with_columns(pl.when(covered).then(pl.col(c)).alias(c) for c in flags_cols)
     return out.select("date", *CONTEXT_FEATURES)

@@ -127,16 +127,26 @@ def test_chunks_with_date_or_datetime_columns_combine():
     assert both.schema["date"] == pl.Datetime("us") and both.height == 2
 
 
-def test_payrolls_first_friday_with_listed_dates_winning():
+def test_payrolls_come_from_the_bls_schedule():
     from apollo.context.fetch import with_payrolls
 
     listed = pl.DataFrame(
-        {"date": [date(2025, 7, 3)], "kind": ["nfp"], "event": ["Nonfarm Payrolls"]}
+        {"date": [date(2025, 10, 3)], "kind": ["nfp"], "event": ["Nonfarm Payrolls"]}
     )
-    out = with_payrolls(listed, date(2025, 6, 1), date(2025, 8, 31))
-    nfp = out.filter(pl.col("kind") == "nfp")["date"].to_list()
-    assert nfp == [
-        date(2025, 6, 6),
-        date(2025, 7, 3),
-        date(2025, 8, 1),
-    ]  # July moved for the holiday
+    nfp = with_payrolls(listed, date(2024, 1, 1), date(2026, 2, 28)).filter(pl.col("kind") == "nfp")
+    days = set(nfp["date"])
+    assert {date(2024, 3, 8), date(2025, 1, 10), date(2026, 1, 9), date(2025, 11, 20)} <= days
+    assert not {date(2024, 3, 1), date(2025, 1, 3), date(2026, 1, 2), date(2025, 10, 3)} & days
+
+
+def test_refetched_window_replaces_cached_rows(tmp_path):
+    old = pl.DataFrame({"date": [date(2027, 1, 1)], "kind": ["nfp"], "event": ["Nonfarm Payrolls"]})
+    collect_context(
+        tmp_path, date(2026, 11, 9), fetch_vol=lambda s: VOL3, fetch_events=lambda s, e: old
+    )
+    new = pl.DataFrame({"date": [date(2027, 1, 8)], "kind": ["nfp"], "event": ["Nonfarm Payrolls"]})
+    collect_context(
+        tmp_path, date(2026, 11, 20), fetch_vol=lambda s: VOL3, fetch_events=lambda s, e: new
+    )
+    cached = pl.read_parquet(tmp_path / "context" / "events.parquet")
+    assert cached["date"].to_list() == [date(2027, 1, 8)]

@@ -46,12 +46,32 @@ def test_vix_change_over_five_closes():
 def test_event_flags_on_the_day_only():
     ev = pl.DataFrame(
         {
-            "date": [date(2026, 11, 10), date(2026, 11, 10)],
-            "kind": ["cpi", "other"],
-            "event": ["CPI", "GDP"],
+            "date": [date(2026, 11, 2), date(2026, 11, 10), date(2026, 11, 10)],  # covers Nov 2-10
+            "kind": ["other", "cpi", "other"],
+            "event": ["ISM Manufacturing PMI", "CPI", "GDP"],
         }
     )
     f = context_features(sessions(date(2026, 11, 9), date(2026, 11, 10)), EMPTY_VOL, ev)
     assert f["ev_cpi"].to_list() == [0.0, 1.0] and f["ev_other"].to_list() == [0.0, 1.0]
     assert f["ev_any"].to_list() == [0.0, 1.0] and f["ev_fomc"].to_list() == [0.0, 0.0]
     assert f["vix"].is_null().all()
+
+
+def test_old_vix_is_unknown_not_reused():
+    vol = pl.DataFrame({"date": [date(2026, 11, 6)], "vix": [25.0], "vix3m": [20.0], "vxn": [30.0]})
+    f = context_features(sessions(date(2026, 11, 9), date(2026, 11, 20)), vol, EMPTY_EVENTS)
+    assert f["vix"].to_list() == [25.0, None]  # Friday's close serves Monday, not two weeks later
+
+
+def test_events_outside_the_cache_are_unknown():
+    ev = pl.DataFrame(
+        {
+            "date": [date(2026, 11, 10), date(2026, 12, 9)],
+            "kind": ["cpi", "fomc"],
+            "event": ["CPI", "FOMC"],
+        }
+    )
+    f = context_features(
+        sessions(date(2026, 11, 2), date(2026, 11, 11), date(2027, 3, 1)), EMPTY_VOL, ev
+    )
+    assert f["ev_any"].to_list() == [None, 0.0, None]
