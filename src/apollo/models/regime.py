@@ -48,17 +48,24 @@ def _one_hot(label: str | None) -> np.ndarray:
 def regime_baselines(
     labels: list[str], dates: list[date], first: int = 250
 ) -> dict[str, np.ndarray]:
-    """Two baselines: the most common label seen at each refit, and yesterday's label."""
+    """Baselines a model must beat.
+
+    majority: the most common label so far (for accuracy). yesterday: the previous session's
+    label. frequency: each label's share so far, the fair yardstick for log-loss.
+    """
     n = len(labels)
     majority = np.full((n, len(LABELS)), np.nan)
+    frequency = np.full((n, len(LABELS)), np.nan)
     pts = refit_points(dates, first)
     for k, start in enumerate(pts):
         end = pts[k + 1] if k + 1 < len(pts) else n
-        majority[start:end] = _one_hot(Counter(labels[:start]).most_common(1)[0][0])
+        counts = Counter(labels[:start])
+        majority[start:end] = _one_hot(counts.most_common(1)[0][0])
+        frequency[start:end] = [counts[lab] / start for lab in LABELS]
     yesterday = np.full((n, len(LABELS)), np.nan)
     for i in range(max(first, 1), n):
         yesterday[i] = _one_hot(labels[i - 1])
-    return {"majority": majority, "yesterday": yesterday}
+    return {"majority": majority, "yesterday": yesterday, "frequency": frequency}
 
 
 def regime_metrics(proba: np.ndarray, labels: list[str]) -> dict:

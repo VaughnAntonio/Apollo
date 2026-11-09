@@ -37,3 +37,11 @@ def test_metrics_confusion():
     p = np.eye(4)[[0, 1, 2, 2]]
     m = regime_metrics(p, ["trend_up", "trend_down", "chop", "normal"])
     assert m["accuracy"] == 0.75 and m["n"] == 4 and m["confusion"][3][2] == 1
+
+
+def test_frequency_baseline_uses_training_mix():
+    y = ["chop"] * 150 + ["normal"] * 100 + ["trend_up"] * 50
+    f = regime_baselines(y, DATES_300)["frequency"]
+    assert f[250, LABELS.index("chop")] == pytest.approx(0.6)
+    assert f[250, LABELS.index("normal")] == pytest.approx(0.4)
+    assert f[250].sum() == pytest.approx(1.0)
