@@ -12,7 +12,9 @@ data. The goal is one concrete change for next week, not a lecture.
 
 Use the first source that exists:
 
-1. Apollo's journal export, once Plan 5 has built it.
+1. Apollo's journal export: run
+   `.venv/bin/python -m apollo.journal.stats --out docs/reviews/journal-export.csv` and read that
+   CSV. It holds real trades, so it stays out of git. Rows with `scaled` true are the case study's.
 2. The case study's public data: `data/public/trades_public.csv` (one row per journalled
    trade) and `data/public/days_public.csv` (one row per trading day) in
    `VaughnAntonio/mnq-trading-case-study`. If no local clone exists, run
