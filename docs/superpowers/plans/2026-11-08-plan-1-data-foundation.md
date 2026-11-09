@@ -22,7 +22,7 @@ pyright, GitHub Actions.
 **Spec:** `docs/superpowers/specs/2026-11-08-apollo-predictor-design.md`
 (sections 3, 5.3, 5.13 data-quality, 6, 7).
 
-## Roadmap (this plan is 1 of 7)
+## Roadmap (this plan is 1 of 7, plus optional Plan 8)
 
 The spec covers seven subsystems. Each gets its own plan, written when the
 previous one has shipped, so later plans can use the real interfaces:
@@ -41,6 +41,9 @@ previous one has shipped, so later plans can use the real interfaces:
    trade drawing.
 7. **Guide, pages, snapshot and README:** guided tour, explainers,
    Models/Backtest/Case study pages, static export, GitHub Pages, model cards.
+8. **Optional, after 7: security and bug pass** with VulnClaw (offline code
+   scan; local-only pentest via Ollama), plus `pip-audit`, `npm audit`,
+   `bandit` and a whole-repo review. Spec 5.16.
 
 ## Global Constraints
 

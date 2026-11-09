@@ -573,6 +573,45 @@ is needed. They're never in the signal:
   write a dated report on discipline, cutting losses, sizing and "Gamba"
   days. It runs inside his existing Claude plan, so it costs nothing extra.
 
+### 5.16 Optional security and bug pass with VulnClaw (Plan 8, after Plan 7)
+
+Added 2026-11-09 at Vaughn's request. **Optional.** It runs only after Plan 7
+is finished, and only if Vaughn starts it.
+
+- **Tool:** [VulnClaw](https://github.com/Netw0rkNoob/VulnClaw) (MIT, 3.9k
+  stars), an AI-agent security toolkit. Apollo uses two of its modes, both
+  aimed only at Apollo itself:
+  1. **Source-code scan, `vulnclaw code scan`.**
+     - Levels L1 (regex) and L2 (structural) run offline with no AI model,
+       so they're free.
+     - It scans `src/`, `web/src/`, `.github/workflows/` and `config/`, and
+       writes SARIF to `reports/security/`.
+     - Level L3 (LLM-assisted) is used only with a local Ollama model, to
+       stay free. Otherwise it's skipped.
+  2. **Pentest of Apollo's own local API and web app**, on `127.0.0.1`
+     only, while they run on Vaughn's laptop.
+     - This needs a language model, so it uses local Ollama, or it's
+       skipped.
+     - It never targets any other host: not GitHub Pages, not Yahoo, Cboe or
+       Nasdaq, nothing external. Apollo is the only system Vaughn is
+       authorised to test.
+- **Install:** in its own virtual environment (`~/.venvs/vulnclaw`), never in
+  Apollo's dependencies. It pulls in many packages that Apollo doesn't need.
+- **Gaps it doesn't cover,** and the free tools that fill them in the same
+  pass: known-vulnerable dependencies (`pip-audit` for Python, `npm audit`
+  for the web app), and Python-specific checks (`bandit`). These run in the
+  same isolated environment.
+- **Triage:** every finding is sorted into one of three kinds:
+  - **real:** fixed test-first (a failing test reproduces it, then the fix);
+  - **false positive:** recorded with a one-line reason in
+    `docs/reviews/security-<date>.md`;
+  - **accepted risk:** Vaughn decides, and the reason is recorded.
+- **"Any type of bug":** the security scan finds security issues only.
+  General bugs are covered by the existing test suite and the whole-branch
+  reviews each plan already gets. Plan 8 adds a final whole-repo review
+  (`/ponytail-audit`, then `/code-review`) after the scan, so the pass covers
+  both.
+
 ## 6. Repository layout (proposed)
 
 ```
