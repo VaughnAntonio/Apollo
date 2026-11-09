@@ -24,7 +24,7 @@ COLUMNS = {
     "opened_at": "TIMESTAMPTZ NOT NULL",
     "closed_at": "TIMESTAMPTZ",
     "symbol": "VARCHAR NOT NULL",
-    "side": "VARCHAR NOT NULL",
+    "side": "VARCHAR",
     "entry": "DOUBLE",
     "stop": "DOUBLE",
     "initial_stop": "DOUBLE",
@@ -54,8 +54,9 @@ JSON_FIELDS = ("tags", "model_snapshot")
 def _validate(e: dict[str, Any]) -> None:
     if e.get("symbol") not in load_symbols():
         raise ValueError(f"unknown symbol {e.get('symbol')!r}")
-    if e.get("side") not in SIDES:
-        raise ValueError("side must be 'long' or 'short'")
+    imported = e.get("source") == "imported"
+    if e.get("side") not in SIDES and not (imported and e.get("side") is None):
+        raise ValueError("side must be 'long' or 'short'")  # case-study rows didn't record it
     if e.get("source") not in SOURCES:
         raise ValueError(f"source must be one of {sorted(SOURCES)}")
     if e.get("stage") is not None and e["stage"] not in STAGES:
@@ -179,6 +180,13 @@ class JournalStore:
         updated = self.get(id)
         assert updated is not None
         return updated
+
+    def import_keys(self) -> set[str]:
+        with self._db() as db:
+            rows = db.execute(
+                "SELECT import_key FROM journal WHERE import_key IS NOT NULL"
+            ).fetchall()
+        return {r[0] for r in rows}
 
     def delete(self, id: int) -> bool:
         with self._db() as db:
