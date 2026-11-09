@@ -27,3 +27,12 @@ attempt,run_at,git_commit,code,layer,variant,final,config_hash,n_trades,expectan
 26,2026-11-09T19:54:17+00:00,dbe01e2-dirty,MNQ,1H-5m,both+risk+fomc,False,3f02010b8598,0,nan,nan,nan,nan,0.0,nan
 27,2026-11-09T19:54:18+00:00,dbe01e2-dirty,MNQ,1H-5m,both+risk+event,False,e3ccbbf9afec,0,nan,nan,nan,nan,0.0,nan
 28,2026-11-09T19:56:50+00:00,dbe01e2-dirty,MNQ,1H-5m,plain,False,4a59b14ff5b7,0,nan,nan,nan,nan,0.0,nan
+29,2026-11-09T20:11:30+00:00,660bc31,MNQ,D-1H,plain,False,ae6bfefb5cbd,14,-0.3592,-0.7421,0.07,0.2143,-5.059,0.002
+30,2026-11-09T20:11:32+00:00,660bc31-dirty,MNQ,D-1H,regime,False,ad10d5d0a351,1,-0.0699,-0.0699,-0.0699,0.0,-0.07,0.0
+31,2026-11-09T20:11:33+00:00,660bc31-dirty,MNQ,D-1H,range,False,a350d83fec22,3,-0.6975,-1.0139,-0.0699,0.0,-2.092,0.0
+32,2026-11-09T20:11:34+00:00,660bc31-dirty,MNQ,D-1H,both,False,1599514119a0,1,-0.0699,-0.0699,-0.0699,0.0,-0.07,0.0
+33,2026-11-09T20:11:35+00:00,660bc31-dirty,MNQ,D-1H,plain+risk,False,e6359b40c409,14,-0.3592,-0.7421,0.07,0.2143,-5.059,0.002
+34,2026-11-09T20:11:36+00:00,660bc31-dirty,MNQ,D-1H,both+risk,False,8f0ff80641b5,1,-0.0699,-0.0699,-0.0699,0.0,-0.07,0.0
+35,2026-11-09T20:11:37+00:00,660bc31-dirty,MNQ,D-1H,both+risk+be,False,b7568b999ea3,1,-0.0699,-0.0699,-0.0699,0.0,-0.07,0.0
+36,2026-11-09T20:11:38+00:00,660bc31-dirty,MNQ,D-1H,both+risk+fomc,False,cc67c43bf1c3,1,-0.0699,-0.0699,-0.0699,0.0,-0.07,0.0
+37,2026-11-09T20:11:40+00:00,660bc31-dirty,MNQ,D-1H,both+risk+event,False,854e965d7a96,0,nan,nan,nan,nan,0.0,nan
