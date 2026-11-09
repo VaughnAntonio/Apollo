@@ -1,0 +1,4 @@
+attempt,run_at,git_commit,code,feature_set,config_hash,n_scored,logit_acc,logit_ll,gbm_ll,freq_ll,range_both,range_width
+1,2026-11-09T18:35:01+00:00,848bb24,MNQ,health,2b4c03503d30,239,0.3515,1.3435,1.6614,1.3,0.8947,1095.5
+2,2026-11-09T18:35:27+00:00,848bb24,MNQ,context,cabee36b0781,239,0.3933,1.3881,1.6671,1.3,0.8947,1130.3
+3,2026-11-09T18:35:56+00:00,848bb24,MNQ,both,15d46df783d3,239,0.3598,1.4396,1.6611,1.3,0.89,1071.5
