@@ -1,0 +1,11 @@
+{
+  "symbol": "MSFT",
+  "interval": "15m",
+  "rows": 1062,
+  "duplicates": 0,
+  "gaps": [],
+  "bad_ticks": [],
+  "bad_days": [
+    "2026-09-11"
+  ]
+}

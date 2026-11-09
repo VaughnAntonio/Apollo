@@ -1,0 +1,11 @@
+{
+  "symbol": "AAPL",
+  "interval": "5m",
+  "rows": 3186,
+  "duplicates": 0,
+  "gaps": [],
+  "bad_ticks": [],
+  "bad_days": [
+    "2026-09-11"
+  ]
+}
