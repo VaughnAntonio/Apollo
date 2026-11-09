@@ -518,6 +518,61 @@ these was found in comparable repos.
   target, features, validation method, metrics, known failure modes and
   limitations.
 
+### 5.14 Market context from OpenBB (added 2026-11-09)
+
+The Plan 3 results showed the regime detector, built on price alone, does not
+beat a frequency baseline. Vaughn chose OpenBB (Apache-2.0) as the free
+source of context the price series can't show. Only providers that need no
+API key are used.
+
+| Context | OpenBB source | Point in time |
+|---|---|---|
+| VIX, VIX3M, VXN daily closes | `obb.index.price.historical`, provider `cboe` | Close of the last trading day before D |
+| High-impact US releases: FOMC decision, CPI, nonfarm payrolls, PCE, GDP, retail sales, ISM manufacturing | `obb.economy.calendar`, provider `nasdaq` | Scheduled in advance, so known before D |
+| FOMC decision dates (check only) | `obb.economy.fomc_documents`, provider `federal_reserve` | Used to verify the calendar, not as a feature |
+
+- **Known data quirk:** the Nasdaq calendar lists events one day late (CPI
+  of 2024-12-11 appears on 12-12) and mixes ET and CT times. Apollo shifts
+  dates back one day, ignores the listed times, and a test checks the result
+  against known release dates and the Fed's FOMC dates.
+- **New features** (the context set):
+  - `vix`, `vix_chg5` (5-day log change), `vix_term` (VIX / VIX3M; above 1
+    means stress);
+  - `vxn`, `vxn_vix` (Nasdaq-100 volatility vs S&P 500 volatility);
+  - `ev_fomc`, `ev_cpi`, `ev_nfp`, `ev_other`, `ev_any` (0/1 for session D).
+- **Where they're used:**
+  - both models (regime and range), as features next to the health set;
+  - Plan 4's strategy: an event-day rule (skip, or cut size) to be decided
+    there with the backtest.
+- **Honesty:** this is the regime model's second attempt. Every model run is
+  appended to `runs/log.csv` (attempt number, feature set, config hash,
+  metrics), and the report shows each attempt and an ablation (health only,
+  context only, both). Spec 5.13's run log starts here.
+- **Not used:** TradingAgents (LLM agents). It costs money or needs a large
+  local model, can't be backtested honestly (an LLM trained on later data
+  already knows past outcomes), and gives different answers on each run.
+  Vaughn declined it to keep Apollo free.
+
+### 5.15 Investor Skills (added 2026-11-09)
+
+Seven skills from questflowai/investorskills (MIT) are installed as Claude
+Code project skills in `.claude/skills/`, with the licence and source kept:
+`ptj-macro-trend`, `seykota-systematic-trend`, `turtle-trading`,
+`livermore`, `marks-cycles`, `simons-quant`, `druckenmiller`. The others are
+long-horizon stock picking, activism or crypto, and don't fit an intraday
+futures tool.
+
+They are judgment frameworks (text), not code, so they're used where judgment
+is needed. They're never in the signal:
+- **Risk-rule review.** Before Plan 4 is written, the stop, sizing, daily
+  loss and "don't lose big" rules in 5.6 are reviewed against PTJ, Seykota,
+  Turtle and Livermore. The result is `docs/reviews/risk-rules-review.md`, a
+  list of concrete rule changes for Vaughn to accept or reject.
+- **Journal review.** A project skill, `journal-review`, has Claude Code apply
+  the same frameworks to Vaughn's journal export and case-study data, then
+  write a dated report on discipline, cutting losses, sizing and "Gamba"
+  days. It runs inside his existing Claude plan, so it costs nothing extra.
+
 ## 6. Repository layout (proposed)
 
 ```
