@@ -39,6 +39,9 @@ jobs:
 
       - run: .venv/bin/python -m apollo.data.collect --root data_store
 
+      - name: Refresh market context from OpenBB (VIX, VXN, economic calendar)
+        run: .venv/bin/python -m apollo.context.collect --root data_store
+
       - name: Score finished sessions in the ledger
         run: |
           for s in MNQ MES M2K MYM; do

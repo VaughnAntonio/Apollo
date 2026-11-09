@@ -38,6 +38,9 @@ jobs:
       - name: Fetch the bars up to the 08:00 ET cutoff
         run: .venv/bin/python -m apollo.data.collect --root data_store --symbols MNQ,MES,M2K,MYM --intervals 1h,1d
 
+      - name: Refresh market context from OpenBB (VIX, VXN, economic calendar)
+        run: .venv/bin/python -m apollo.context.collect --root data_store
+
       - name: Write today's forecasts to the ledger
         run: |
           for s in MNQ MES M2K MYM; do

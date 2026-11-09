@@ -8,7 +8,10 @@ version = "0.1.0"
 description = "Regime and range forecasts for a mechanical TTrades Fractal Model, with a trade journal."
 requires-python = ">=3.13"
 license = "MIT"
-dependencies = ["polars", "pyarrow", "yfinance", "pandas", "numpy", "scipy", "scikit-learn", "mapie"]
+dependencies = ["polars", "pyarrow", "yfinance", "pandas", "numpy", "scipy", "scikit-learn", "mapie",
+    "openbb-core", "openbb-index", "openbb-economy", "openbb-cboe", "openbb-nasdaq",
+    "openbb-federal-reserve", "certifi",
+]
 
 [project.optional-dependencies]
 dev = ["pytest", "ruff", "pyright"]
