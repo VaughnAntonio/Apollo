@@ -33,7 +33,13 @@
   .seg button[aria-pressed=true]{background:var(--ink);color:var(--bg)}
   .dl{padding:6px 12px;background:var(--brand);color:var(--brand-fg);border-radius:4px;font:500 10px 'Geist Mono',monospace;letter-spacing:.1em;text-transform:uppercase}
   main{display:grid;grid-template-columns:300px 1fr;min-height:0}
-  .list{border-right:1px solid var(--line);overflow:auto;max-height:calc(100dvh - 120px)}
+  .list{border-right:1px solid var(--line);overflow-y:auto;overflow-x:hidden;max-height:calc(100dvh - 120px)}
+  /* Thin scrollbars: a hairline thumb on a clear track, darker on hover. */
+  *{scrollbar-width:thin;scrollbar-color:var(--line) transparent}
+  ::-webkit-scrollbar{width:6px;height:6px}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
+  ::-webkit-scrollbar-thumb:hover{background:var(--muted)}
   .item{display:grid;grid-template-columns:10px 1fr auto;gap:4px 10px;align-items:center;width:100%;padding:9px 16px;border-bottom:1px solid var(--line)}
   .item:hover,.item[aria-current]{background:var(--soft)}
   .item small{grid-column:2/4;color:var(--muted)}
