@@ -151,3 +151,12 @@ def test_no_deferral_past_the_setup_window(ohlc):
         build_candidates(s, two_sessions(ohlc), NONE, MNQ, CFG, V["plain"], "D-1H")["skip"][0]
         == "outside_window"
     )
+
+
+def test_cisd_on_the_last_session_bar_of_c3_is_not_carried(ohlc):
+    sig = datetime(2026, 11, 4, 15, tzinfo=NY)  # 15:00 ET on C3's own day
+    s = deferred_setup(sig, datetime(2026, 11, 4, 17, tzinfo=NY))
+    assert (
+        build_candidates(s, two_sessions(ohlc), NONE, MNQ, CFG, V["plain"], "D-1H")["skip"][0]
+        == "outside_window"
+    )

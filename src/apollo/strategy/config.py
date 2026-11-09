@@ -2,7 +2,7 @@
 
 import tomllib
 from dataclasses import dataclass
-from datetime import time
+from datetime import date, time
 from pathlib import Path
 
 from apollo.config import CONFIG_DIR
@@ -45,6 +45,7 @@ class TradeConfig:
     min_stop_ticks: int
     max_stop_zone_frac: float
     holdout_months: int
+    holdout_from: date
     variants: dict[str, Variant]
 
 
@@ -76,5 +77,6 @@ def load_trade_config(path: Path = CONFIG_DIR / "strategy.toml") -> TradeConfig:
         min_stop_ticks=risk["min_stop_ticks"],
         max_stop_zone_frac=risk["max_stop_zone_frac"],
         holdout_months=raw["backtest"]["holdout_months"],
+        holdout_from=date.fromisoformat(raw["backtest"]["holdout_from"]),
         variants={k: Variant(*v) for k, v in raw["variants"].items()},
     )

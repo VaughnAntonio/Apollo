@@ -169,3 +169,36 @@ def test_rule_two_as_proposed_halts_after_one_loss(ohlc):
         cands(cand(3, 11), cand(4, 11), cand(5, 11), cand(6, 11)), pl.concat(days), MNQ, CFG, RISK
     )[0]
     assert t["skip"].to_list() == [None, "cushion", "cushion", "cushion"]
+
+
+def test_open_profit_trails_the_threshold(ohlc):
+    # The trade runs to +4 points (111 contracts: +888) before stopping out. APEX trails on that
+    # open peak, so the threshold rises from -2500 to min(888 - 2500, 100) = -1612.
+    bars = ohlc([(102, 106, 101.5, 105.5), (105.5, 105.6, 99, 99.5)], "2026-11-03 11:00", "1h")
+    _, state = simulate(cands(cand(3, 11, target=110.0)), bars, MNQ, CFG, PLAIN)
+    assert state["peak"] == pytest.approx(111 * 4 * 2) and state["threshold"] == pytest.approx(
+        888 - 2500
+    )
+
+
+def test_breach_inside_a_trade_counts(ohlc):
+    cfg = replace(CFG, account=replace(CFG.account, drawdown=700.0))
+    # runs +888 open (threshold -> 100, the lock), then the stop takes equity below it
+    bars = pl.concat(
+        [
+            ohlc([(102, 106, 101.5, 105.5), (105.5, 105.6, 99, 99.5)], "2026-11-03 11:00", "1h"),
+            ohlc([QUIET], "2026-11-04 11:00", "1h"),
+        ]
+    )
+    t, state = simulate(cands(cand(3, 11, target=110.0), cand(4, 11)), bars, MNQ, cfg, PLAIN)
+    assert state["breached_at"] is not None and t["skip"].to_list() == [None, "account_breached"]
+
+
+def test_five_minute_bars_with_a_gap_at_the_start(ohlc):
+    # the first two 5m bars are 10 minutes apart; the bar size must still read as 5m
+    first = ohlc([QUIET], "2026-11-03 09:30", "5m")
+    rest = ohlc([QUIET, (102.5, 105.5, 102, 105)], "2026-11-03 09:40", "5m")
+    t, _ = simulate(
+        cands(cand(3, 9)), pl.concat([first, rest]).with_columns(pl.col("ts")), MNQ, CFG, PLAIN
+    )
+    assert str(t["exit_ts"][0]) == "2026-11-03 14:50:00+00:00"  # the 09:45 bar closes 09:50 ET

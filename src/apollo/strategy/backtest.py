@@ -11,6 +11,8 @@ appended to runs/backtests.csv.
 import argparse
 import hashlib
 import json
+import subprocess
+from dataclasses import replace
 from datetime import UTC, date, datetime
 from functools import lru_cache
 from pathlib import Path
@@ -66,10 +68,10 @@ def config_hash(layer: str, variant: str) -> str:
 
 
 @lru_cache(maxsize=8)
-def _forecasts(root: str, code: str) -> pl.DataFrame:
+def _forecasts(root: str, code: str, select_before: date) -> pl.DataFrame:
     from apollo.models.report import forecast_frame  # slow: fits the models once per process
 
-    return forecast_frame(Path(root), code)
+    return forecast_frame(Path(root), code, select_before=select_before)
 
 
 def _when(c: dict) -> date:
@@ -98,7 +100,7 @@ def run_backtest(
     if bars is LOAD:
         bars = read_bars(root, code, PAIRINGS[layer][1])  # type: ignore[arg-type]
     if forecasts is LOAD:
-        forecasts = _forecasts(str(root), code)
+        forecasts = _forecasts(str(root), code, cfg.holdout_from)
     if d1 is LOAD:
         d1 = read_bars(root, code, "1d")
     if sessions is LOAD:
@@ -112,12 +114,17 @@ def run_backtest(
     if "ltf_missing" in setups.columns:  # older than the lower-timeframe history: not a test case
         before_data = setups.filter(pl.col("ltf_missing")).height
         setups = setups.filter(~pl.col("ltf_missing"))
-    boundary = holdout_start(sessions, cfg.holdout_months)
+    boundary = cfg.holdout_from  # pinned: more data never moves it
     cands = build_candidates(setups, bars, forecasts, sym, cfg, variant, layer)
     keep = [(_when(c) >= boundary) == final for c in cands.iter_rows(named=True)]
     cands = cands.filter(pl.Series(keep, dtype=pl.Boolean))
     when = [_when(c) for c in cands.iter_rows(named=True)]
-    trades, state = simulate(cands, bars, sym, cfg, variant)
+    # The strategy's record ignores the account: with no limit, a breach can't hide later trades.
+    # The account run then answers the separate question of what the prop firm would have allowed.
+    unlimited = replace(cfg, account=replace(cfg.account, drawdown=1e12, lock=1e12))
+    trades, _ = simulate(cands, bars, sym, unlimited, variant)
+    acct_trades, state = simulate(cands, bars, sym, cfg, variant)
+    acct_done = acct_trades.filter(pl.col("skip").is_null())
 
     skips: dict[str, int] = {}
     for s in [*cands["skip"].drop_nulls().to_list(), *trades["skip"].drop_nulls().to_list()]:
@@ -146,29 +153,55 @@ def run_backtest(
             "2%": prop_monte_carlo(r, cfg.account, 0.02),
         },
         "benchmarks": bench,
-        "breached_at": state["breached_at"],
+        "account": {
+            "name": cfg.account.name,
+            "trades": acct_done.height,
+            "net_$": float(acct_done["net_$"].sum()) if acct_done.height else 0.0,
+            "breached_at": state["breached_at"],
+            "peak_$": state["peak"],
+        },
         "_trades": trades,
         "_daily": daily,
     }
 
 
-def check_lock(path: Path, chash: str, variants: list[str]) -> None:
-    """Allow --final only with the config the first --final run used."""
+def _git(*args: str) -> str:
+    return subprocess.run(
+        ["git", *args], capture_output=True, text=True, check=False
+    ).stdout.strip()
+
+
+def check_lock(
+    path: Path, chash: str, variants: list[str], *, commit: str, dirty: bool, holdout_from: date
+) -> str:
+    """Allow --final only on committed code, with the code, config and holdout of the first one.
+
+    Returns the lock hash, which every final run logs so its rows can be matched to the lock.
+    """
+    if dirty:
+        raise SystemExit("Commit your changes first: a final test must name the exact code it ran.")
+    spec = f"{chash}|{commit}|{holdout_from.isoformat()}|{','.join(sorted(variants))}"
+    lock_hash = hashlib.sha256(spec.encode()).hexdigest()[:12]
     if path.exists():
         lock = json.loads(path.read_text())
-        if lock["config_hash"] != chash:
+        if lock["lock_hash"] != lock_hash:
             raise SystemExit(
-                f"The holdout was already used on {lock['date']} with config {lock['config_hash']}. "
-                "A second final test with different rules would no longer be out of sample."
+                f"The holdout was already used on {lock['date']} (commit {lock['commit']}, "
+                f"config {lock['config_hash']}). A second final test with different code or rules "
+                "would no longer be out of sample."
             )
-        return
+        return lock_hash
     path.parent.mkdir(parents=True, exist_ok=True)
     record = {
         "date": datetime.now(UTC).date().isoformat(),
+        "commit": commit,
         "config_hash": chash,
-        "variants": variants,
+        "holdout_from": holdout_from.isoformat(),
+        "variants": sorted(variants),
+        "lock_hash": lock_hash,
     }
     path.write_text(json.dumps(record, indent=2))
+    return lock_hash
 
 
 def log_backtest(path: Path, res: dict) -> int:
@@ -225,8 +258,17 @@ def main(argv: list[str] | None = None) -> int:
     cfg = load_trade_config()
     names = list(cfg.variants) if a.variants == "all" else a.variants.split(",")
     layer = cast(Layer, a.layer)
+    lock_hash = None
     if a.final:
-        check_lock(RUNS / "holdout.lock", config_hash(layer, ",".join(names)), names)
+        dirty = bool(_git("status", "--porcelain", "--", "src", "config"))
+        lock_hash = check_lock(
+            RUNS / "holdout.lock",
+            config_hash(layer, ",".join(names)),
+            names,
+            commit=_git("rev-parse", "HEAD"),
+            dirty=dirty,
+            holdout_from=cfg.holdout_from,
+        )
 
     results = []
     print(
@@ -238,6 +280,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     for name in names:
         res = run_backtest(a.root, a.symbol, layer, name, cfg, a.final)
+        if lock_hash:
+            res["config_hash"] = lock_hash  # final rows point at the lock
         res["attempt"] = log_backtest(RUNS / "backtests.csv", res)
         e, mc = res["expectancy"], res["monte_carlo"]
         skips = sorted(

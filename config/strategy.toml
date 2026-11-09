@@ -34,6 +34,9 @@ max_stop_zone_frac = 0.5    # 5: skip if the stop is wider than half the forecas
 
 [backtest]
 holdout_months = 3          # Vaughn's choice, 2026-11-09
+# Pinned on the first full backtest run (2026-11-09): sessions from this date on are the holdout.
+# Never move it; a moving date would leak held-out sessions into development as data arrives.
+holdout_from = "2026-08-06"
 
 [variants]                  # regime, range, risk_rules, breakeven, fomc_cutoff, event_half
 plain = [false, false, false, false, false, false]

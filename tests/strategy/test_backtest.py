@@ -27,7 +27,7 @@ def test_holdout_start():
     assert holdout_start(days, 3) == date(2026, 8, 6)  # first session on or after 3 months back
 
 
-def _frames(ohlc):
+def _frames(ohlc, days=(date(2026, 6, 2), date(2026, 10, 6))):
     """Two identical winning setups: one in June (development), one in October (holdout)."""
 
     def setup(day):
@@ -41,7 +41,6 @@ def _frames(ohlc):
             "after_c2_protected": 100.0,
         }
 
-    days = [date(2026, 6, 2), date(2026, 10, 6)]
     setups = pl.DataFrame(
         [setup(d) for d in days], schema_overrides={"c2_ts": TS, "after_c2_cisd_ts": TS}
     )
@@ -68,10 +67,12 @@ def test_non_final_run_never_sees_holdout(ohlc):
         bars=bars,
         forecasts=pl.DataFrame(),
         d1=None,
-        sessions=sessions,
+        sessions=sessions + weekdays(date(2026, 11, 9), date(2027, 3, 1)),  # more data arrived
     )
     assert res["n_setups"] == 1 and res["expectancy"]["n"] == 1
-    assert res["period"]["end"] < holdout_start(sessions, CFG.holdout_months)
+    assert (
+        res["period"]["end"] < CFG.holdout_from and res["holdout_from"] == CFG.holdout_from
+    )  # more data: same cut
     final = run_backtest(
         Path("unused"),
         "MNQ",
@@ -85,21 +86,40 @@ def test_non_final_run_never_sees_holdout(ohlc):
         d1=None,
         sessions=sessions,
     )
-    assert final["n_setups"] == 1 and final["period"]["start"] >= holdout_start(
-        sessions, CFG.holdout_months
-    )
+    assert final["n_setups"] == 1 and final["period"]["start"] >= CFG.holdout_from
     assert sum(res["skip_counts"].values()) == res["n_setups"]
 
 
-def test_final_lock_refuses_changed_config(tmp_path):
+def test_final_lock_refuses_changed_config_or_code(tmp_path):
     lock = tmp_path / "holdout.lock"
-    assert check_lock(lock, "aaa", ["plain"]) is None  # first final run writes the lock
-    assert json.loads(lock.read_text())["config_hash"] == "aaa"
-    assert (
-        check_lock(lock, "aaa", ["plain"]) is None
-    )  # same config: allowed (logged as a new attempt)
+    hold = date(2026, 8, 6)
+    first = check_lock(lock, "aaa", ["plain"], commit="c1", dirty=False, holdout_from=hold)
+    saved = json.loads(lock.read_text())
+    assert saved["commit"] == "c1" and saved["holdout_from"] == "2026-08-06"
+    assert saved["lock_hash"] == first
+    # the same config and code may re-run (it's logged as a new attempt)
+    assert check_lock(lock, "aaa", ["plain"], commit="c1", dirty=False, holdout_from=hold) == first
     with pytest.raises(SystemExit):
-        check_lock(lock, "bbb", ["plain"])
+        check_lock(lock, "aaa", ["plain"], commit="c2", dirty=False, holdout_from=hold)
+    with pytest.raises(SystemExit):
+        check_lock(lock, "bbb", ["plain"], commit="c1", dirty=False, holdout_from=hold)
+
+
+def test_dirty_tree_refused_before_any_lock(tmp_path):
+    with pytest.raises(SystemExit):
+        check_lock(
+            tmp_path / "holdout.lock",
+            "aaa",
+            ["plain"],
+            commit="c1",
+            dirty=True,
+            holdout_from=date(2026, 8, 6),
+        )
+    assert not (tmp_path / "holdout.lock").exists()
+
+
+def test_holdout_date_is_pinned_in_config():
+    assert CFG.holdout_from == date(2026, 8, 6)
 
 
 def test_backtests_log_appends_per_variant(tmp_path):
@@ -130,3 +150,24 @@ def test_one_holdout_date_for_every_layer():
     a = run_backtest(Path("data_store"), "MNQ", "D-1H", "plain", CFG)
     b = run_backtest(Path("data_store"), "MNQ", "1H-5m", "plain", CFG)
     assert a["holdout_from"] == b["holdout_from"]
+
+
+def test_strategy_stats_ignore_the_account_breach(ohlc):
+    from dataclasses import replace
+
+    setups, bars, sessions = _frames(ohlc, days=(date(2026, 6, 2), date(2026, 6, 9)))
+    tiny = replace(CFG, account=replace(CFG.account, drawdown=1.0))  # breaches on the first dip
+    res = run_backtest(
+        Path("unused"),
+        "MNQ",
+        "D-1H",
+        "plain",
+        tiny,
+        setups=setups,
+        bars=bars,
+        forecasts=pl.DataFrame(),
+        d1=None,
+        sessions=sessions,
+    )
+    assert res["expectancy"]["n"] == 2  # the strategy's own record keeps both trades
+    assert res["account"]["breached_at"] is not None and res["account"]["trades"] == 1

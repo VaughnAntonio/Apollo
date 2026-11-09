@@ -3,6 +3,10 @@
 Fills are at the entry bar's open. A bar that touches both the stop and the target counts as a
 stop. Every position is flat at the close of the last bar that opens before `flat_at` ET. Costs
 are commission plus slippage per contract per side, taken off the gross P&L.
+
+The prop-firm threshold trails the highest equity reached, open profit included, as APEX does:
+each bar first raises the peak by the trade's best price, then checks its worst price against the
+threshold. Within a bar the order of high and low is unknown, so that is the cautious reading.
 """
 
 from datetime import date, datetime
@@ -38,8 +42,13 @@ def _commission(sym: Symbol, cfg: TradeConfig) -> float:
 
 
 def _interval(bars: pl.DataFrame) -> str:
-    step = (bars["ts"][1] - bars["ts"][0]).total_seconds() / 60 if bars.height > 1 else 60
-    return {5: "5m", 15: "15m", 60: "1h"}.get(int(step), "1h")
+    """Bar size from the smallest spacing (bars are never closer than their size), so gaps in
+    the data can't change it."""
+    if bars.height < 2:
+        return "1h"
+    gaps = np.diff(bars["ts"].sort().dt.epoch("s").to_numpy())
+    step = float(gaps[gaps > 0].min()) / 60
+    return {5: "5m", 15: "15m", 60: "1h"}.get(round(step), "1h")
 
 
 def simulate(
@@ -106,6 +115,13 @@ def simulate(
             if reached_1r and variant.breakeven:
                 stop = entry if sign * (entry - stop) > 0 else stop
             worst, best = (lo[i], hi[i]) if sign > 0 else (hi[i], lo[i])
+            peak = max(peak, equity + sign * (best - entry) * pv * contracts)
+            threshold = min(peak - acct.drawdown, acct.lock)
+            if (
+                breached_at is None
+                and equity + sign * (worst - entry) * pv * contracts <= threshold
+            ):
+                breached_at = close_ts[i]
             if sign * (worst - stop) <= 0:
                 exit_px, exit_t = stop, close_ts[i]
                 reason = "breakeven" if stop == entry else "stop"

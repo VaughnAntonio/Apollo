@@ -72,8 +72,24 @@ def _next_session(now: datetime) -> date:
     return d
 
 
+def choose_model(
+    probs: dict[str, np.ndarray], y: np.ndarray, dates: list[date], first: int, before: date | None
+) -> str:
+    """The regime model with the lower log-loss, judged only on sessions before `before`.
+
+    Choosing on sessions the strategy is later tested on would leak them into the choice.
+    """
+    rows = [i for i in range(first, len(y)) if before is None or dates[i] < before]
+    labels = [y[i] for i in rows]
+    return min(("logit", "gbm"), key=lambda k: regime_metrics(probs[k][rows], labels)["log_loss"])
+
+
 def build_report(
-    root: Path, code: str, now: datetime | None = None, feature_set: FeatureSet = "both"
+    root: Path,
+    code: str,
+    now: datetime | None = None,
+    feature_set: FeatureSet = "both",
+    select_before: date | None = None,
 ) -> dict:
     now = now or datetime.now(UTC)
     columns = FEATURE_SETS[feature_set]
@@ -111,7 +127,7 @@ def build_report(
     probs |= regime_baselines(list(y), dates, FIRST)
     test = list(y[FIRST:])
     regime = {k: regime_metrics(p[FIRST:], test) for k, p in probs.items()}
-    chosen = min(("logit", "gbm"), key=lambda k: regime[k]["log_loss"])
+    chosen = choose_model(probs, y, dates, FIRST, select_before)
 
     # Regime probabilities only exist out-of-sample; earlier rows get an even 25% each.
     prior = np.nan_to_num(probs[chosen], nan=1 / len(LABELS))
@@ -199,9 +215,16 @@ def build_report(
     }
 
 
-def forecast_frame(root: Path, code: str, feature_set: FeatureSet = "both") -> pl.DataFrame:
-    """Out-of-sample forecasts per session, for the strategy's filters (Plan 4)."""
-    rows = build_report(root, code, feature_set=feature_set)["sessions"]
+def forecast_frame(
+    root: Path, code: str, feature_set: FeatureSet = "both", select_before: date | None = None
+) -> pl.DataFrame:
+    """Out-of-sample forecasts per session, for the strategy's filters (Plan 4).
+
+    Pass the holdout date as `select_before` so the regime model is chosen without it.
+    """
+    rows = build_report(root, code, feature_set=feature_set, select_before=select_before)[
+        "sessions"
+    ]
     return pl.DataFrame(
         [
             {
