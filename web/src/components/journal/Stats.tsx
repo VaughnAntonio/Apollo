@@ -23,7 +23,7 @@ const line = (s?: Summary) =>
 const MONTHS = new Intl.DateTimeFormat('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' })
 
 /** A month of daily R: one cell per day, coloured by sign. */
-function Calendar({ days, day, onDay }: { days: JournalStats['calendar']; day: string | null; onDay: (d: string | null) => void }) {
+export function Calendar({ days, day, onDay }: { days: JournalStats['calendar']; day: string | null; onDay: (d: string | null) => void }) {
   const byDate = useMemo(() => new Map(days.map((d) => [d.date, d])), [days])
   const latest = days.at(-1)?.date ?? new Date().toISOString().slice(0, 10)
   const [month, setMonth] = useState(latest.slice(0, 7))

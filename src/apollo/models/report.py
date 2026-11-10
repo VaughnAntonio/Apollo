@@ -11,7 +11,7 @@ import hashlib
 import json
 from datetime import UTC, date, datetime, time, timedelta
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 from zoneinfo import ZoneInfo
 
 import numpy as np
@@ -38,6 +38,7 @@ FEATURE_SETS: dict[str, tuple[str, ...]] = {
     "both": (*FEATURES, *CONTEXT_FEATURES),
 }
 RUN_LOG = Path("runs") / "log.csv"
+IMPORTANCE_TAIL = 60  # importance is scored on the last 60 sessions, fitted on the rest
 
 
 def _config_hash(columns: tuple[str, ...]) -> str:
@@ -70,6 +71,82 @@ def _next_session(now: datetime) -> date:
     while d.weekday() >= 5:
         d += timedelta(days=1)
     return d
+
+
+def model_check(sessions: list[dict]) -> dict[str, Any]:
+    """Range hit rate and regime accuracy over the last 60 sessions, for the rail."""
+    last = sessions[-60:]
+    if not last:
+        return {"n": 0, "range_hit": None, "regime_accuracy": None}
+    right = sum(max(s["proba"], key=s["proba"].get) == s["label"] for s in last)
+    return {
+        "n": len(last),
+        "range_hit": sum(bool(s["hit_both"]) for s in last) / len(last),
+        "regime_accuracy": right / len(last),
+    }
+
+
+def feature_importance(
+    model, X: np.ndarray, y: list[str], names: list[str], top: int = 10
+) -> list[dict]:
+    """How much the log-loss worsens when each feature is shuffled, biggest first."""
+    from sklearn.inspection import permutation_importance
+    from sklearn.metrics import log_loss, make_scorer
+
+    # name the classes, or a scored tail without one regime makes log_loss refuse
+    scorer = make_scorer(
+        log_loss,
+        greater_is_better=False,
+        response_method="predict_proba",
+        labels=list(model.classes_),
+    )
+    res = permutation_importance(model, X, y, scoring=scorer, n_repeats=10, random_state=0)
+    ranked = sorted(zip(names, res["importances_mean"], strict=True), key=lambda t: -t[1])
+    return [{"feature": n, "drop": float(d)} for n, d in ranked[:top]]
+
+
+def ledger_summary(root: Path, code: str) -> dict[str, Any]:
+    """The forward record so far: when it started, how many forecasts, how many scored."""
+    entries = [json.loads(p.read_text()) for p in sorted((root / "ledger" / code).glob("*.json"))]
+    scored = [e for e in entries if "scored_at" in e]
+    return {
+        "since": min((e["date"] for e in entries), default=None),
+        "n": len(entries),
+        "scored": len(scored),
+        "hit_both": sum(bool(e.get("hit_both")) for e in scored) / len(scored) if scored else None,
+    }
+
+
+def models_view(report: dict) -> dict:
+    """The --ablation shape, {feature_set: run}, even when the file holds a single run."""
+    return {report["feature_set"]: report} if "code" in report else report
+
+
+def forecast_cached(
+    root: Path, code: str, today: date, cache_dir: Path = Path("reports")
+) -> dict[str, Any]:
+    """The rail's forecast, refitted at most once per New York day and kept on disk."""
+    path = cache_dir / f"forecast_{code}.json"
+    if path.exists():
+        hit = json.loads(path.read_text())
+        if hit.get("date") == today.isoformat():
+            return hit
+    r = build_report(root, code)
+    out = {
+        "date": today.isoformat(),
+        "latest": r["latest"],
+        "range": r["range"],
+        "regime_model": r["chosen"],
+        "model_check": model_check(r["sessions"]),
+        "importance": r.get("importance", []),
+        "ledger": ledger_summary(root, code),
+        "research_only": True,
+    }
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(out))
+    tmp.replace(path)  # a reader never sees half a file
+    return out
 
 
 def choose_model(
@@ -175,6 +252,13 @@ def build_report(
     x_next = ahead_f.tail(1).select(columns).to_numpy().astype(float)
     fit, predict = fit_regime(chosen)  # type: ignore[arg-type]
     p_next = predict(fit(X, y), x_next)[0]
+    cut = len(y) - IMPORTANCE_TAIL
+    try:  # an extra: it must never take the forecast down with it
+        importance = feature_importance(
+            fit(X[:cut], y[:cut]), X[cut:], list(y[cut:]), list(columns)
+        )
+    except ValueError:  # e.g. a regime in the tail that the fit never saw
+        importance = []
     xr_next = np.hstack([x_next, p_next[None, :]])
     latest = {
         "date": nxt.isoformat(),
@@ -210,6 +294,7 @@ def build_report(
         "chosen": chosen,
         "range": rng,
         "sessions": rows,
+        "importance": importance,
         "latest": latest,
         "_sessions_frame": sessions,
     }

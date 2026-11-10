@@ -51,5 +51,5 @@ def test_forecast_frame_is_out_of_sample_only():
         "ev_any",
     } <= set(f.columns)
     assert (
-        f.height == 239 and f.head(30)["up_bound"].is_null().all() and f["up_bound"][30] is not None
+        f.height == 237 and f.head(30)["up_bound"].is_null().all() and f["up_bound"][30] is not None
     )

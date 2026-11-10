@@ -1,15 +1,12 @@
-import type { Bar, Entry, Forecast, JournalIn, JournalPatch, JournalStats, Signal, Sym } from './types'
+import { isStatic } from '../lib/mode'
+import { ApiError } from './error'
+import { staticApi } from './static'
+import type { BacktestRecord, Bar, Entry, Explain, Forecast, JournalIn, JournalPatch, JournalStats, Layer, ModelsReport, Signal, Sym } from './types'
+
+export { ApiError }
 
 export const API = import.meta.env.VITE_API ?? 'http://127.0.0.1:8000'
 export const START_API = 'Start the API: python -m apollo.api.main'
-
-export class ApiError extends Error {
-  status: number
-  constructor(message: string, status: number) {
-    super(message)
-    this.status = status
-  }
-}
 
 type Query = Record<string, string | number | undefined>
 
@@ -26,7 +23,9 @@ async function call<T>(path: string, query: Query = {}, init: RequestInit = {}):
   const body = await res.json().catch(() => null)
   if (!res.ok) {
     const detail = body?.detail
-    throw new ApiError(typeof detail === 'string' ? detail : `Request failed (${res.status})`, res.status)
+    // FastAPI sends a string; pydantic validation sends a list of {msg, loc, ...}
+    const msg = typeof detail === 'string' ? detail : Array.isArray(detail) ? detail[0]?.msg : undefined
+    throw new ApiError(typeof msg === 'string' ? msg : `Request failed (${res.status})`, res.status)
   }
   return body as T
 }
@@ -37,7 +36,7 @@ const json = (method: string, body: unknown): RequestInit => ({
   body: JSON.stringify(body),
 })
 
-export const api = {
+export const liveApi = {
   symbols: () => call<Sym[]>('/symbols'),
   bars: (symbol: string, tf: string, start?: number) =>
     call<Bar[]>('/bars', {
@@ -47,6 +46,9 @@ export const api = {
     }),
   signal: (symbol: string) => call<Signal>('/signal', { symbol }),
   forecast: (symbol: string) => call<Forecast>('/forecast', { symbol }),
+  backtest: (symbol: string, layer: Layer) => call<BacktestRecord[]>('/backtest/summary', { symbol, layer }),
+  models: (symbol: string) => call<ModelsReport>('/models', { symbol }),
+  explain: (symbol: string) => call<Explain>('/explain', { symbol }),
   journal: {
     list: () => call<Entry[]>('/journal'),
     get: (id: number) => call<Entry>(`/journal/${id}`),
@@ -67,6 +69,13 @@ export const api = {
     stats: () => call<JournalStats>('/journal/stats'),
   },
 }
+
+type Api = typeof liveApi
+// Picked on every access, so the mode can't go stale and tests can switch it.
+const readOnly: Api = staticApi // the type check that both clients have the same shape
+export const api: Api = new Proxy(liveApi, {
+  get: (_, key: keyof Api) => (isStatic() ? readOnly : liveApi)[key],
+})
 
 /** Stored screenshot paths look like `journal_media/<name>`; the API serves them at /media. */
 export const mediaUrl = (path: string) => `${API}/media/${path.replace(/^journal_media\//, '')}`

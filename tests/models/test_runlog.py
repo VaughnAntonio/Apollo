@@ -50,7 +50,7 @@ def test_health_set_reproduces_plan_3_and_both_reports_events():
     from apollo.models.report import build_report
 
     health = build_report(Path("data_store"), "MNQ", feature_set="health")
-    assert health["regime"]["logit"]["n"] == 239
-    assert round(health["regime"]["logit"]["log_loss"], 3) == 1.344
+    assert health["regime"]["logit"]["n"] == 237  # 239 before the 2026-11-10 sync lost 2 sessions
+    assert round(health["regime"]["logit"]["log_loss"], 3) == 1.338
     both = build_report(Path("data_store"), "MNQ", feature_set="both")
     assert set(both["range"]["by_event"]) == {"0", "1"} and both["feature_set"] == "both"

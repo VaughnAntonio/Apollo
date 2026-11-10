@@ -28,7 +28,14 @@ from apollo.fractal.model import PAIRINGS, run_model
 from apollo.models.runlog import append_run
 from apollo.strategy.candidates import build_candidates
 from apollo.strategy.config import TradeConfig, load_trade_config
-from apollo.strategy.metrics import benchmarks, equity_stats, expectancy_ci, prop_monte_carlo
+from apollo.strategy.metrics import (
+    benchmark_curves,
+    benchmarks,
+    equity_stats,
+    expectancy_ci,
+    monthly_table,
+    prop_monte_carlo,
+)
 from apollo.strategy.simulate import simulate
 
 NY = ZoneInfo("America/New_York")
@@ -135,6 +142,19 @@ def run_backtest(
     period = {"start": min(when) if when else None, "end": max(when) if when else None}
     bench = benchmarks(d1, min(when), max(when), sym) if d1 is not None and when else {}
     daily = done.group_by("session").agg(pl.col("net_$").sum()).sort("session")
+    closed = done.filter(pl.col("net_$").is_not_null()).sort("exit_ts")
+    by_exit = (
+        closed.group_by(day=pl.col("exit_ts").dt.convert_time_zone("America/New_York").dt.date())
+        .agg(pl.col("net_$").sum())
+        .sort("day")
+    )
+    curves = {
+        "strategy": [
+            {"date": d.isoformat(), "usd": float(v)}
+            for d, v in zip(by_exit["day"], by_exit["net_$"].cum_sum(), strict=True)
+        ],
+        **(benchmark_curves(d1, min(when), max(when), sym) if d1 is not None and when else {}),
+    }
     return {
         "code": code,
         "layer": layer,
@@ -153,6 +173,18 @@ def run_backtest(
             "2%": prop_monte_carlo(r, cfg.account, 0.02),
         },
         "benchmarks": bench,
+        "trades": [
+            {
+                "session": t["session"].isoformat(),
+                "direction": t["direction"],
+                "r": t["r"],
+                "net_$": t["net_$"],
+                "exit_reason": t["exit_reason"],
+            }
+            for t in done.sort("session").iter_rows(named=True)
+        ],
+        "curves": curves,
+        "monthly": monthly_table(trades),
         "account": {
             "name": cfg.account.name,
             "trades": acct_done.height,

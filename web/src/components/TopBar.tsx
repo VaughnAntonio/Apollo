@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react'
+import { useSnapshotDate } from '../api/static'
+import { isStatic } from '../lib/mode'
 import { TIMEFRAMES, type Tf } from '../lib/chart'
 
 type Props = {
@@ -11,11 +13,12 @@ type Props = {
 }
 
 export function TopBar({ tf, onTf, trades, onTrades, left, chart = true }: Props) {
+  const snapshot = useSnapshotDate()
   return (
     <header className="flex flex-wrap items-center gap-6 border-b px-5 py-3">
       {left}
       {chart && (
-      <nav aria-label="Timeframe" className="flex gap-0.5">
+      <nav aria-label="Timeframe" data-tour="timeframes" className="flex gap-0.5">
         {TIMEFRAMES.map((t) => (
           <button
             key={t.tf}
@@ -34,12 +37,12 @@ export function TopBar({ tf, onTf, trades, onTrades, left, chart = true }: Props
         <button type="button" aria-pressed={trades} onClick={() => onTrades(!trades)} className="flex items-center gap-1.5">
           <span
             aria-hidden="true"
-            className={`relative inline-block h-3 w-[22px] rounded-full border border-ink after:absolute after:top-px after:left-px after:size-2 after:rounded-full after:bg-ink after:transition-transform ${trades ? 'after:translate-x-2.5' : ''}`}
+            className={`relative inline-block h-3 w-[22px] rounded-full border border-ink after:absolute after:top-px after:left-px after:size-2 after:rounded-full after:bg-ink motion-safe:after:transition-transform ${trades ? 'after:translate-x-2.5' : ''}`}
           />
           Trades
         </button>
         )}
-        <span>Delayed 10m</span>
+        <span>{isStatic() ? (snapshot ? `Snapshot of ${snapshot}` : 'Snapshot') : 'Delayed 10m'}</span>
       </div>
     </header>
   )

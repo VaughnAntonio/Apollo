@@ -40,3 +40,16 @@ export function setVisibility(state: 'visible' | 'hidden') {
   Object.defineProperty(document, 'visibilityState', { value: state, configurable: true })
   document.dispatchEvent(new Event('visibilitychange'))
 }
+
+/** Serve snapshot files by path; anything else is a 404, as on GitHub Pages. */
+export function mockFiles(files: Record<string, unknown>) {
+  const fn = vi.fn(async (input: RequestInfo | URL) => {
+    const path = new URL(String(input), 'http://x').pathname
+    return path in files
+      ? new Response(JSON.stringify(files[path]), { status: 200 })
+      : new Response('<html>404</html>', { status: 404 })
+  })
+  vi.stubGlobal('fetch', fn)
+  return fn
+}
+

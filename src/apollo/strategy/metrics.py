@@ -60,8 +60,8 @@ def equity_stats(trades: pl.DataFrame) -> dict:
     }
 
 
-def benchmarks(d1: pl.DataFrame, start: date, end: date, sym: Symbol) -> dict:
-    """Buy & hold and the case study's MA 20/50 rule, 1 contract, over [start, end]."""
+def _bench_days(d1: pl.DataFrame, start: date, end: date, sym: Symbol) -> pl.DataFrame:
+    """Per day over [start, end]: the 1-contract dollar move, and whether MA 20/50 was long."""
     shift = timedelta(hours=6) if sym.kind == "future" else timedelta(0)
     d = d1.sort("ts").with_columns(
         day=(pl.col("ts").dt.convert_time_zone("America/New_York") + shift).dt.date(),
@@ -70,11 +70,42 @@ def benchmarks(d1: pl.DataFrame, start: date, end: date, sym: Symbol) -> dict:
         long=(pl.col("close").rolling_mean(20) > pl.col("close").rolling_mean(50)).shift(1),
     )
     w = d.filter(pl.col("day").is_between(start, end)).drop_nulls("pts")
-    pv = sym.point_value
+    return w.select(
+        "day",
+        bh=pl.col("pts") * sym.point_value,
+        ma=pl.when(pl.col("long").fill_null(False)).then(pl.col("pts")).otherwise(0.0)
+        * sym.point_value,
+    )
+
+
+def benchmarks(d1: pl.DataFrame, start: date, end: date, sym: Symbol) -> dict:
+    """Buy & hold and the case study's MA 20/50 rule, 1 contract, over [start, end]."""
+    w = _bench_days(d1, start, end, sym)
+    return {"buy_hold_$": float(w["bh"].sum()), "ma_20_50_$": float(w["ma"].sum())}
+
+
+def benchmark_curves(d1: pl.DataFrame, start: date, end: date, sym: Symbol) -> dict:
+    """The same benchmarks as daily cumulative dollars, for the equity chart."""
+    w = _bench_days(d1, start, end, sym)
+    days = [d.isoformat() for d in w["day"]]
     return {
-        "buy_hold_$": float(w["pts"].to_numpy().sum()) * pv,
-        "ma_20_50_$": float(w.filter(pl.col("long").fill_null(False))["pts"].to_numpy().sum()) * pv,
+        name: [{"date": d, "usd": float(v)} for d, v in zip(days, w[col].cum_sum(), strict=True)]
+        for name, col in (("buy_hold", "bh"), ("ma_20_50", "ma"))
     }
+
+
+def monthly_table(trades: pl.DataFrame) -> list[dict]:
+    """Closed trades grouped by the month of their session."""
+    t = trades.filter(pl.col("skip").is_null() & pl.col("net_$").is_not_null())
+    g = (
+        t.group_by(month=pl.col("session").dt.strftime("%Y-%m"))
+        .agg(n=pl.len(), r=pl.col("r").sum(), net=pl.col("net_$").sum())
+        .sort("month")
+    )
+    return [
+        {"month": m, "n": int(n), "r": float(r), "net_$": float(net)}
+        for m, n, r, net in g.iter_rows()
+    ]
 
 
 def prop_monte_carlo(

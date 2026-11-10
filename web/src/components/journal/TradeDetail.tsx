@@ -1,5 +1,6 @@
 import { useRef, useState, type ReactNode } from 'react'
 import { api, ApiError, mediaUrl } from '../../api/client'
+import { isStatic } from '../../lib/mode'
 import type { Entry } from '../../api/types'
 import { nyDateTime } from '../../lib/time'
 import { fmtPrice, fmtR, fmtUsd, NOT_RECORDED } from '../../lib/trade'
@@ -25,7 +26,7 @@ export function TradeDetail({ entry: e, onEdit, onDeleted, onChanged }: Props) {
   const [confirm, setConfirm] = useState(false)
   const [error, setError] = useState<ApiError | null>(null)
   const file = useRef<HTMLInputElement>(null)
-  const editable = e.source !== 'imported'
+  const editable = e.source !== 'imported' && !isStatic()
   const snap = (e.model_snapshot ?? null) as Snapshot | null
 
   const run = async (f: () => Promise<unknown>, after: () => void) => {
@@ -61,9 +62,9 @@ export function TradeDetail({ entry: e, onEdit, onDeleted, onChanged }: Props) {
         )}
       </div>
       {confirm && (
-        <div role="alertdialog" className="mb-4 flex flex-wrap items-center gap-3 border-y py-3">
-          <span>Delete this trade? This can't be undone.</span>
-          <button type="button" className={`${btn} border-down text-down`} onClick={() => run(() => api.journal.remove(e.id), onDeleted)}>
+        <div role="alertdialog" aria-labelledby={`delete-${e.id}`} className="mb-4 flex flex-wrap items-center gap-3 border-y py-3">
+          <span id={`delete-${e.id}`}>Delete this trade? This can't be undone.</span>
+          <button type="button" autoFocus className={`${btn} border-down text-down`} onClick={() => run(() => api.journal.remove(e.id), onDeleted)}>
             Yes, delete
           </button>
           <button type="button" className={btn} onClick={() => setConfirm(false)}>

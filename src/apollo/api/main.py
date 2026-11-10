@@ -22,12 +22,12 @@ from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from apollo.config import load_symbols
+from apollo.data.serve import TIMEFRAMES, bars_json, read_tf
 from apollo.data.store import read_bars
 from apollo.journal.stats import calendar, journal_stats
 from apollo.journal.store import JournalStore
 from apollo.journal.trades import auto_close, close_trade, take_trade
 
-TIMEFRAMES = ("1m", "5m", "15m", "1h", "4h", "1d")
 DEV_ORIGIN = "http://localhost:5173"  # Plan 6's Vite dev server; nothing else may call the API
 MAX_SHOT = 5 * 1024 * 1024
 IMAGE_TYPES = {"image/png": "png", "image/jpeg": "jpg"}
@@ -93,36 +93,10 @@ class CloseIn(BaseModel):
     reason: str = "manual"
 
 
-def model_check(sessions: list[dict]) -> dict[str, Any]:
-    """Range hit rate and regime accuracy over the last 60 sessions, for the rail."""
-    last = sessions[-60:]
-    if not last:
-        return {"n": 0, "range_hit": None, "regime_accuracy": None}
-    right = sum(max(s["proba"], key=s["proba"].get) == s["label"] for s in last)
-    return {
-        "n": len(last),
-        "range_hit": sum(bool(s["hit_both"]) for s in last) / len(last),
-        "regime_accuracy": right / len(last),
-    }
-
-
 def _default_signal(root: Path, code: str, now: datetime) -> dict[str, Any]:
     from apollo.live.signal import current_signal
 
     return current_signal(root, code, now)
-
-
-def _default_forecast(root: Path, code: str) -> dict[str, Any]:
-    from apollo.models.report import build_report
-
-    r = build_report(root, code)
-    return {
-        "latest": r["latest"],
-        "range": r["range"],
-        "regime_model": r["chosen"],
-        "model_check": model_check(r["sessions"]),
-        "research_only": True,
-    }
 
 
 def create_app(
@@ -132,7 +106,7 @@ def create_app(
     media_dir: Path = Path("journal_media"),
     reports_dir: Path = Path("reports"),
     signal_fn: Callable[[Path, str, datetime], dict[str, Any]] = _default_signal,
-    forecast_fn: Callable[[Path, str], dict[str, Any]] = _default_forecast,
+    forecast_fn: Callable[[Path, str], dict[str, Any]] | None = None,
     web_origin: str = DEV_ORIGIN,
 ) -> FastAPI:
     app = FastAPI(title="Apollo Predictor", description="Research tool. Not financial advice.")
@@ -148,6 +122,14 @@ def create_app(
         if origin is not None and origin != web_origin:
             return JSONResponse({"detail": "origin not allowed"}, status_code=403)
         return await call_next(request)
+
+    if forecast_fn is None:
+        from apollo.models.report import forecast_cached
+
+        def daily(root: Path, code: str) -> dict[str, Any]:
+            return forecast_cached(root, code, datetime.now(NY).date(), reports_dir)
+
+        forecast_fn = daily
 
     store = JournalStore(journal_path or root / "journal.duckdb")
     symbols = load_symbols()
@@ -195,18 +177,7 @@ def create_app(
         known(symbol)
         if tf not in TIMEFRAMES:
             raise HTTPException(422, f"tf must be one of {TIMEFRAMES}")
-        if tf == "4h":
-            from apollo.fractal.model import complete_4h
-
-            df = complete_4h(read_bars(root, symbol, "1h", start, end))
-        else:
-            df = read_bars(root, symbol, tf, start, end)  # type: ignore[arg-type]
-        return [
-            {"time": int(t.timestamp()), "open": o, "high": h, "low": lo, "close": c, "volume": v}
-            for t, o, h, lo, c, v in df.select(
-                "ts", "open", "high", "low", "close", "volume"
-            ).iter_rows()
-        ]
+        return bars_json(read_tf(root, symbol, tf, start, end))
 
     @app.get("/forecast")
     def forecast(symbol: str) -> dict:
@@ -250,7 +221,14 @@ def create_app(
 
     @app.post("/journal/auto-close")
     def auto_close_open(symbol: str = "MNQ") -> dict:
-        open_ = [e for e in store.list(symbol=known(symbol)) if e["exit"] is None]
+        # only trades auto_close can act on: not imported, with a full plan
+        open_ = [
+            e
+            for e in store.list(symbol=known(symbol))
+            if e["exit"] is None
+            and e["source"] != "imported"
+            and None not in (e["entry"], e["stop"], e["target"], e["side"])
+        ]
         if not open_:
             return {"closed": []}
         since = min(e["opened_at"] for e in open_).astimezone(UTC)  # the bars are in UTC
@@ -311,7 +289,7 @@ def create_app(
     @app.get("/media/{name}")
     def media(name: str) -> FileResponse:
         path = media_dir / name
-        if not MEDIA_NAME.match(name) or not path.is_file():
+        if not MEDIA_NAME.fullmatch(name) or not path.is_file():
             raise HTTPException(404, "no such file")
         return FileResponse(path, media_type="image/png" if name.endswith(".png") else "image/jpeg")
 
@@ -324,6 +302,26 @@ def create_app(
             )
         return json.loads(path.read_text())
 
+    @app.get("/explain")
+    def explain(symbol: str) -> Any:
+        from apollo import explain as ex
+
+        if known(symbol) != ex.EXAMPLE["symbol"]:
+            raise HTTPException(404, f"the worked example is on {ex.EXAMPLE['symbol']} only")
+        day = ex.EXAMPLE["date"]
+        return cached("explain", symbol, day.isoformat(), lambda: ex.explain_day(root, symbol, day))
+
+    @app.get("/models")
+    def models(symbol: str) -> Any:
+        from apollo.models.report import ledger_summary, models_view
+
+        path = reports_dir / f"models_{known(symbol)}.json"
+        if not path.exists():
+            raise HTTPException(
+                404, "no models report yet; run python -m apollo.models.report --ablation"
+            )
+        return models_view(json.loads(path.read_text())) | {"ledger": ledger_summary(root, symbol)}
+
     return app
 
 
@@ -335,8 +333,14 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--root", type=Path, default=Path("data_store"))
     p.add_argument("--web-port", type=int, default=5173, help="the local port the web app runs on")
     a = p.parse_args(argv)
+    # another root (a sandbox) keeps its screenshots and reports beside its own journal
+    dirs = (
+        {}
+        if a.root == Path("data_store")
+        else {"media_dir": a.root / "journal_media", "reports_dir": a.root / "reports"}
+    )
     uvicorn.run(
-        create_app(a.root, web_origin=f"http://localhost:{a.web_port}"),
+        create_app(a.root, web_origin=f"http://localhost:{a.web_port}", **dirs),
         host="127.0.0.1",
         port=a.port,
     )

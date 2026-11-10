@@ -2,6 +2,7 @@ import { useState, type FormEvent, type ReactNode } from 'react'
 import { api, ApiError } from '../api/client'
 import type { CheckRow, Entry, Signal } from '../api/types'
 import { usePoll } from '../api/usePoll'
+import { isStatic } from '../lib/mode'
 import { fmtPct, fmtPrice, fmtR, message, openR, parseNum, parseSize } from '../lib/trade'
 import { Empty, ErrorLine, Skeleton } from './State'
 
@@ -28,9 +29,9 @@ type Props = {
   onChanged: () => void
 }
 
-function Section({ label, children }: { label: string; children: ReactNode }) {
+function Section({ label, tour, children }: { label: string; tour?: string; children: ReactNode }) {
   return (
-    <section className="border-b px-5 py-4">
+    <section data-tour={tour} className="border-b px-5 py-4">
       <h2 className="mb-3 font-mono text-[10px] font-medium tracking-widest text-muted uppercase">{label}</h2>
       {children}
     </section>
@@ -75,6 +76,7 @@ function TakeTrade({ symbol, signal, onTaken }: { symbol: string; signal: Signal
     return (
       <button
         type="button"
+        data-tour="take-trade"
         className={`${btn} mt-3 w-full`}
         onClick={() => setForm({ fill: String(signal.entry ?? ''), size: String(signal.contracts ?? 1) })}
       >
@@ -213,7 +215,7 @@ function SignalPanel({ symbol, signal, stale, onTaken }: SignalProps) {
       <div className="mt-1 h-[3px] bg-soft">
         <i className="block h-full bg-ink" style={{ width: `${Math.min(100, (signal.risk_of_limit ?? 0) * 100)}%` }} />
       </div>
-      {!stale && <TakeTrade symbol={symbol} signal={signal} onTaken={onTaken} />}
+      {!stale && !isStatic() && <TakeTrade symbol={symbol} signal={signal} onTaken={onTaken} />}
     </div>
   )
 }
@@ -225,7 +227,7 @@ export function Rail({ symbol, openTrade, lastClose, onTaken, onChanged }: Props
 
   return (
     <aside className="border-t md:overflow-auto md:border-t-0 md:border-l">
-      <Section label="Top-down">
+      <Section label="Top-down" tour="checklist">
         {sig.data ? (
           <>
             <Checklist signal={sig.data} />
@@ -237,7 +239,7 @@ export function Rail({ symbol, openTrade, lastClose, onTaken, onChanged }: Props
           <Skeleton rows={5} />
         )}
       </Section>
-      <Section label={openTrade ? 'Open trade' : 'Signal'}>
+      <Section label={openTrade ? 'Open trade' : 'Signal'} tour="signal">
         {openTrade ? (
           <OpenTrade trade={openTrade} lastClose={lastClose} onChanged={onChanged} />
         ) : sig.data ? (
@@ -251,13 +253,17 @@ export function Rail({ symbol, openTrade, lastClose, onTaken, onChanged }: Props
           <Skeleton rows={4} />
         )}
       </Section>
-      <Section label="Model check, last 60 sessions">
+      <Section label="Model check, last 60 sessions" tour="model-check">
         {fc.data?.status === 'no_model' ? (
           <Empty>Nothing to check yet</Empty>
         ) : mc ? (
           <>
-            <Kv k="Range hit rate" v={fmtPct(mc.range_hit)} />
-            <Kv k="Regime accuracy" v={fmtPct(mc.regime_accuracy)} />
+            <div data-tour="range">
+              <Kv k="Range hit rate" v={fmtPct(mc.range_hit)} />
+            </div>
+            <div data-tour="regime">
+              <Kv k="Regime accuracy" v={fmtPct(mc.regime_accuracy)} />
+            </div>
             {fc.error && <ErrorLine error={fc.error} />}
           </>
         ) : fc.error ? (

@@ -116,3 +116,83 @@ export type JournalStats = {
   }
   calendar: Day[]
 }
+
+export type Layer = 'D-1H' | '1H-5m'
+export type Point = { date: string; usd: number }
+export type MonteCarlo = { p_pass: number | null; p_breach: number | null; median_trades_to_pass: number | null }
+
+/** One variant of a development (or final) backtest, as reports/backtest_<code>_<layer>.json holds it. */
+export type BacktestRecord = {
+  code: string
+  layer: Layer
+  variant: string
+  final: boolean
+  holdout_from: string
+  period: { start: string | null; end: string | null }
+  n_setups: number
+  skip_counts: Record<string, number>
+  expectancy: { n: number; mean: number | null; low: number | null; high: number | null; win_rate: number | null }
+  equity: { 'net_$': number; 'max_dd_$': number; max_dd_r: number; profit_factor: number | null; trades_per_month: number }
+  monte_carlo: Record<'1%' | '2%', MonteCarlo>
+  benchmarks: { 'buy_hold_$'?: number; 'ma_20_50_$'?: number }
+  trades?: { session: string; direction: string; r: number | null; 'net_$': number | null; exit_reason: string | null }[]
+  curves?: { strategy: Point[]; buy_hold?: Point[]; ma_20_50?: Point[] }
+  monthly?: { month: string; n: number; r: number; 'net_$': number }[]
+  attempt?: number
+}
+
+export type RegimeScore = { n: number; accuracy: number; log_loss: number; confusion: number[][] }
+export type Ledger = { since: string | null; n: number; scored: number; hit_both: number | null }
+
+/** One feature set's run of apollo.models.report. */
+export type ModelsRun = {
+  code: string
+  generated: string
+  feature_set: 'health' | 'context' | 'both'
+  sessions_total: number
+  sessions_used: number
+  dropped: Record<string, number>
+  regime: Record<string, RegimeScore>
+  chosen: string
+  range: { n: number; both: number; up: number; down: number; mean_width: number; by_regime?: Record<string, number> }
+  sessions: { date: string; label: string; hit_both: boolean | null }[]
+  importance?: { feature: string; drop: number }[]
+}
+
+/** GET /models: the --ablation report (one run per feature set) plus the forward ledger. */
+export type ModelsReport = { health?: ModelsRun; context?: ModelsRun; both?: ModelsRun; ledger: Ledger }
+
+export type Setup = {
+  direction: 'bull' | 'bear'
+  c1_ts: number
+  c2_ts: number
+  c2_close: number
+  c1_high: number
+  c1_low: number
+  poi_level: number | null
+  poi_kind: string | null
+  cisd_ts: number
+  cisd_level: number
+  protected: number
+  entry_ts: number | null
+  entry: number
+  stop: number
+  target: number
+}
+
+/** GET /explain: one past day, worked through for the Guide page. Times are UTC seconds. */
+export type Explain = {
+  date: string
+  symbol: string
+  fractal: { htf: Bar[]; ltf: Bar[]; setup: Setup }
+  regime: { features: Record<string, number | null>; proba: Record<string, number>; model: string; label: string }
+  range: {
+    open: number
+    up_bound: number
+    down_bound: number
+    high: number
+    low: number
+    hit_both: boolean | null
+    coverage_60: { date: string; hit_both: boolean }[]
+  }
+}
