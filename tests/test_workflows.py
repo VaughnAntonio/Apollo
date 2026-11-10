@@ -38,3 +38,12 @@ def test_publish_workflow_is_safe():
 def test_ci_builds_the_static_site():
     ci = Path(".github/workflows/ci.yml").read_text()
     assert "VITE_MODE=static VITE_BASE=/Apollo/ npm --prefix web run build" in ci
+
+
+def test_one_failing_command_does_not_skip_the_rest_of_its_symbol():
+    lines = [ln.strip() for ln in PUBLISH.read_text().splitlines()]
+    research = [
+        ln for ln in lines if "apollo.models.report" in ln or "apollo.strategy.backtest" in ln
+    ]
+    assert len(research) == 12
+    assert all('|| echo "::warning::' in ln for ln in research)

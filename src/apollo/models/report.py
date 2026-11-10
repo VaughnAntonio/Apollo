@@ -91,8 +91,16 @@ def feature_importance(
 ) -> list[dict]:
     """How much the log-loss worsens when each feature is shuffled, biggest first."""
     from sklearn.inspection import permutation_importance
+    from sklearn.metrics import log_loss, make_scorer
 
-    res = permutation_importance(model, X, y, scoring="neg_log_loss", n_repeats=10, random_state=0)
+    # name the classes, or a scored tail without one regime makes log_loss refuse
+    scorer = make_scorer(
+        log_loss,
+        greater_is_better=False,
+        response_method="predict_proba",
+        labels=list(model.classes_),
+    )
+    res = permutation_importance(model, X, y, scoring=scorer, n_repeats=10, random_state=0)
     ranked = sorted(zip(names, res["importances_mean"], strict=True), key=lambda t: -t[1])
     return [{"feature": n, "drop": float(d)} for n, d in ranked[:top]]
 
@@ -107,6 +115,11 @@ def ledger_summary(root: Path, code: str) -> dict[str, Any]:
         "scored": len(scored),
         "hit_both": sum(bool(e.get("hit_both")) for e in scored) / len(scored) if scored else None,
     }
+
+
+def models_view(report: dict) -> dict:
+    """The --ablation shape, {feature_set: run}, even when the file holds a single run."""
+    return {report["feature_set"]: report} if "code" in report else report
 
 
 def forecast_cached(
@@ -240,7 +253,12 @@ def build_report(
     fit, predict = fit_regime(chosen)  # type: ignore[arg-type]
     p_next = predict(fit(X, y), x_next)[0]
     cut = len(y) - IMPORTANCE_TAIL
-    importance = feature_importance(fit(X[:cut], y[:cut]), X[cut:], list(y[cut:]), list(columns))
+    try:  # an extra: it must never take the forecast down with it
+        importance = feature_importance(
+            fit(X[:cut], y[:cut]), X[cut:], list(y[cut:]), list(columns)
+        )
+    except ValueError:  # e.g. a regime in the tail that the fit never saw
+        importance = []
     xr_next = np.hstack([x_next, p_next[None, :]])
     latest = {
         "date": nxt.isoformat(),

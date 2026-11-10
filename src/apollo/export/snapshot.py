@@ -24,7 +24,7 @@ from apollo.explain import EXAMPLE, explain_day
 from apollo.journal.stats import calendar, journal_stats
 from apollo.journal.store import JournalStore
 from apollo.live.signal import current_signal
-from apollo.models.report import forecast_cached, ledger_summary
+from apollo.models.report import forecast_cached, ledger_summary, models_view
 
 NY = ZoneInfo("America/New_York")
 BARS_KEPT = {"1d": 750}  # every other timeframe keeps 300
@@ -128,9 +128,17 @@ def export_snapshot(
             src = reports_dir / f"backtest_{code}_{layer}.json"
             if src.exists():
                 _write(out, f"backtest/{code}_{layer}.json", _read(src))
+            elif sym.model_enabled:  # the nightly job should have made it: say it's missing
+                missing.append({"what": "backtest", "symbol": code, "reason": f"no {layer} report"})
         src = reports_dir / f"models_{code}.json"
         if src.exists():
-            _write(out, f"models/{code}.json", _read(src) | {"ledger": ledger_summary(root, code)})
+            _write(
+                out,
+                f"models/{code}.json",
+                models_view(_read(src)) | {"ledger": ledger_summary(root, code)},
+            )
+        elif sym.model_enabled:
+            missing.append({"what": "models", "symbol": code, "reason": "no models report"})
 
     rows = [
         {k: e[k] for k in PUBLIC_FIELDS if k in e}

@@ -32,7 +32,7 @@ export default function App() {
   const [symbol, setSymbol] = useState(() => get('apollo.symbol', 'MNQ'))
   const [tf, setTf] = useState<Tf>(storedTf)
   const [tour, setTour] = useState(false)
-  const [offer, setOffer] = useState(() => !isStatic() && shouldOfferTour())
+  const [offer, setOffer] = useState(shouldOfferTour)
   const [trades, setTrades] = useState(() => get('apollo.trades', 'on') !== 'off')
   const [lastClose, setLastClose] = useState<number | null>(null)
   const journal = usePoll(api.journal.list, [])

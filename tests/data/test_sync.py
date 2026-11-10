@@ -75,3 +75,29 @@ def test_sync_merges_bar_files_so_local_bars_survive(tmp_path, bars):
     assert (
         got.height == 5
     )  # 08:00 and 09:00 kept, 10:00 taken from the branch, 11:00 and 12:00 added
+
+
+def test_an_interrupted_merge_leaves_the_local_file_whole(tmp_path, bars, monkeypatch):
+    import polars as pl
+
+    from apollo.data.store import append_bars, read_bars
+
+    repo = tmp_path / "repo"
+    append_bars(repo, bars("2026-11-03 10:00", 3, "1h"), "1h")
+    _git(repo, "init", "-q", "-b", "data")
+    _git(repo, "config", "user.email", "t@example.com")
+    _git(repo, "config", "user.name", "t")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-qm", "data")
+    root = tmp_path / "root"
+    append_bars(root, bars("2026-11-03 08:00", 3, "1h"), "1h")
+
+    def crash(self, path, **kw):
+        Path(path).write_bytes(b"half a file")
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(pl.DataFrame, "write_parquet", crash)
+    with pytest.raises(KeyboardInterrupt):
+        sync_data(root, ref="data", repo=repo)
+    monkeypatch.undo()
+    assert read_bars(root, "MNQ", "1h").height == 3

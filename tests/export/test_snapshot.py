@@ -115,3 +115,10 @@ def test_the_worked_example_is_exported(tmp_path, store_with_bars, monkeypatch):
     monkeypatch.setattr(snapshot, "explain_day", lambda root, code, day: {"date": day.isoformat()})
     run(store_with_bars, tmp_path)
     assert json.loads((tmp_path / "out/explain/MNQ.json").read_text()) == {"date": "2026-04-22"}
+
+
+def test_missing_reports_are_listed_for_model_symbols(tmp_path, store_with_bars):
+    meta = run(store_with_bars, tmp_path)
+    missing = {(m["what"], m["symbol"]) for m in meta["missing"]}
+    assert ("models", "MNQ") in missing and ("backtest", "MNQ") in missing
+    assert ("models", "NVDA") not in missing  # stocks have no model to report on

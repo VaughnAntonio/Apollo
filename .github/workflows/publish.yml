@@ -41,33 +41,34 @@ jobs:
           git clone --depth 1 https://github.com/VaughnAntonio/mnq-trading-case-study.git case_study
           .venv/bin/python -m apollo.journal.importer --csv-dir case_study/data/public --db snap_journal.duckdb
 
+      # Each command warns and carries on, so one failed refit can't skip that symbol's backtests.
       - name: Models and backtests, MNQ
         continue-on-error: true
         run: |
-          .venv/bin/python -m apollo.models.report --root data_store --symbol MNQ --ablation
-          .venv/bin/python -m apollo.strategy.backtest --root data_store --symbol MNQ --layer D-1H
-          .venv/bin/python -m apollo.strategy.backtest --root data_store --symbol MNQ --layer 1H-5m
+          .venv/bin/python -m apollo.models.report --root data_store --symbol MNQ --ablation || echo "::warning::models failed for MNQ"
+          .venv/bin/python -m apollo.strategy.backtest --root data_store --symbol MNQ --layer D-1H || echo "::warning::backtest D-1H failed for MNQ"
+          .venv/bin/python -m apollo.strategy.backtest --root data_store --symbol MNQ --layer 1H-5m || echo "::warning::backtest 1H-5m failed for MNQ"
 
       - name: Models and backtests, MES
         continue-on-error: true
         run: |
-          .venv/bin/python -m apollo.models.report --root data_store --symbol MES --ablation
-          .venv/bin/python -m apollo.strategy.backtest --root data_store --symbol MES --layer D-1H
-          .venv/bin/python -m apollo.strategy.backtest --root data_store --symbol MES --layer 1H-5m
+          .venv/bin/python -m apollo.models.report --root data_store --symbol MES --ablation || echo "::warning::models failed for MES"
+          .venv/bin/python -m apollo.strategy.backtest --root data_store --symbol MES --layer D-1H || echo "::warning::backtest D-1H failed for MES"
+          .venv/bin/python -m apollo.strategy.backtest --root data_store --symbol MES --layer 1H-5m || echo "::warning::backtest 1H-5m failed for MES"
 
       - name: Models and backtests, M2K
         continue-on-error: true
         run: |
-          .venv/bin/python -m apollo.models.report --root data_store --symbol M2K --ablation
-          .venv/bin/python -m apollo.strategy.backtest --root data_store --symbol M2K --layer D-1H
-          .venv/bin/python -m apollo.strategy.backtest --root data_store --symbol M2K --layer 1H-5m
+          .venv/bin/python -m apollo.models.report --root data_store --symbol M2K --ablation || echo "::warning::models failed for M2K"
+          .venv/bin/python -m apollo.strategy.backtest --root data_store --symbol M2K --layer D-1H || echo "::warning::backtest D-1H failed for M2K"
+          .venv/bin/python -m apollo.strategy.backtest --root data_store --symbol M2K --layer 1H-5m || echo "::warning::backtest 1H-5m failed for M2K"
 
       - name: Models and backtests, MYM
         continue-on-error: true
         run: |
-          .venv/bin/python -m apollo.models.report --root data_store --symbol MYM --ablation
-          .venv/bin/python -m apollo.strategy.backtest --root data_store --symbol MYM --layer D-1H
-          .venv/bin/python -m apollo.strategy.backtest --root data_store --symbol MYM --layer 1H-5m
+          .venv/bin/python -m apollo.models.report --root data_store --symbol MYM --ablation || echo "::warning::models failed for MYM"
+          .venv/bin/python -m apollo.strategy.backtest --root data_store --symbol MYM --layer D-1H || echo "::warning::backtest D-1H failed for MYM"
+          .venv/bin/python -m apollo.strategy.backtest --root data_store --symbol MYM --layer 1H-5m || echo "::warning::backtest 1H-5m failed for MYM"
 
       - name: Export the snapshot
         run: .venv/bin/python -m apollo.export.snapshot --root data_store --journal snap_journal.duckdb --reports reports --out web/public/snapshot

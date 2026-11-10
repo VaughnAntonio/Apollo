@@ -32,8 +32,8 @@ it('No thanks dismisses it for good', () => {
   expect(screen.queryByText('New here? Take the 1-minute tour.')).toBeNull()
 })
 
-it('is never offered on the public snapshot', () => {
+it('is offered on the public snapshot too, where recruiters land', () => {
   vi.stubEnv('VITE_MODE', 'static')
   render(<App />)
-  expect(screen.queryByText('New here? Take the 1-minute tour.')).toBeNull()
+  expect(screen.getByText('New here? Take the 1-minute tour.')).toBeTruthy()
 })

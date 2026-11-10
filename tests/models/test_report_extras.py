@@ -57,3 +57,13 @@ def test_ledger_summary(tmp_path):
         "hit_both": 1.0,
     }
     assert ledger_summary(tmp_path, "MES") == {"since": None, "n": 0, "scored": 0, "hit_both": None}
+
+
+def test_feature_importance_survives_a_tail_missing_a_regime():
+    rng = np.random.default_rng(1)
+    X = rng.normal(size=(200, 2))
+    y = np.where(X[:, 0] > 0.5, "trend_up", np.where(X[:, 0] < -0.5, "chop", "normal"))
+    model = LogisticRegression().fit(X, y)
+    tail = X[:, 0] > -0.5  # no chop in the scored rows
+    imp = feature_importance(model, X[tail], list(y[tail]), ["a", "b"])
+    assert imp[0]["feature"] == "a"

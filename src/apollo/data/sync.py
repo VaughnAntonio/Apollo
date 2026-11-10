@@ -40,9 +40,11 @@ def sync_data(root: Path, ref: str = "origin/data", repo: Path = Path(".")) -> d
             data = src.read()
             if path.parts[0] == "bars" and target.suffix == ".parquet" and target.exists():
                 both = pl.concat([pl.read_parquet(target), pl.read_parquet(io.BytesIO(data))])
+                tmp = target.with_suffix(".tmp")  # replace in one step: never half a file
                 both.unique("ts", keep="last", maintain_order=True).sort("ts").write_parquet(
-                    target, compression="zstd"
+                    tmp, compression="zstd"
                 )
+                tmp.replace(target)
             else:
                 target.write_bytes(data)
             counts[path.parts[0]] = counts.get(path.parts[0], 0) + 1

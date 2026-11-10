@@ -375,3 +375,12 @@ def test_auto_close_window_ignores_imported_and_unplanned_rows(client, tmp_path,
         client.get(f"/journal/{i}").json()["exit"] is not None or True
     )  # the trade itself may stay open
     assert starts and starts[0].astimezone(NY).date().isoformat() == "2026-11-03"
+
+
+def test_models_endpoint_reads_a_single_run_report_too(client, tmp_path):
+    # `python -m apollo.models.report` without --ablation writes one run, not three
+    (tmp_path / "reports/models_MNQ.json").write_text(
+        json.dumps({"code": "MNQ", "feature_set": "both", "chosen": "logit"})
+    )
+    body = client.get("/models", params={"symbol": "MNQ"}).json()
+    assert body["both"]["chosen"] == "logit" and "code" not in body

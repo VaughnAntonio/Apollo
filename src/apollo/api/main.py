@@ -313,14 +313,14 @@ def create_app(
 
     @app.get("/models")
     def models(symbol: str) -> Any:
-        from apollo.models.report import ledger_summary
+        from apollo.models.report import ledger_summary, models_view
 
         path = reports_dir / f"models_{known(symbol)}.json"
         if not path.exists():
             raise HTTPException(
                 404, "no models report yet; run python -m apollo.models.report --ablation"
             )
-        return json.loads(path.read_text()) | {"ledger": ledger_summary(root, symbol)}
+        return models_view(json.loads(path.read_text())) | {"ledger": ledger_summary(root, symbol)}
 
     return app
 
