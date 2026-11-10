@@ -3,7 +3,8 @@
 Run: python -m apollo.data.sync [--root data_store]
 
 Only bars, context, quality and ledger are copied. journal.duckdb and journal_media/
-are local-only and never touched.
+are local-only and never touched. Bar files are merged rather than replaced: Yahoo only
+serves a rolling window, so a local bar the branch lacks can't be fetched again.
 """
 
 import argparse
@@ -12,11 +13,15 @@ import subprocess
 import tarfile
 from pathlib import Path, PurePosixPath
 
+import polars as pl
+
 FOLDERS = ("bars", "context", "quality", "ledger")
 
 
 def sync_data(root: Path, ref: str = "origin/data", repo: Path = Path(".")) -> dict[str, int]:
-    done = subprocess.run(["git", "-C", str(repo), "archive", "--format=tar", ref], capture_output=True)
+    done = subprocess.run(
+        ["git", "-C", str(repo), "archive", "--format=tar", ref], capture_output=True, check=False
+    )
     if done.returncode != 0:
         raise ValueError(f"no such ref {ref}")
     counts: dict[str, int] = {}
@@ -32,7 +37,14 @@ def sync_data(root: Path, ref: str = "origin/data", repo: Path = Path(".")) -> d
             src = tar.extractfile(member)
             if src is None:
                 continue
-            target.write_bytes(src.read())
+            data = src.read()
+            if path.parts[0] == "bars" and target.suffix == ".parquet" and target.exists():
+                both = pl.concat([pl.read_parquet(target), pl.read_parquet(io.BytesIO(data))])
+                both.unique("ts", keep="last", maintain_order=True).sort("ts").write_parquet(
+                    target, compression="zstd"
+                )
+            else:
+                target.write_bytes(data)
             counts[path.parts[0]] = counts.get(path.parts[0], 0) + 1
     return counts
 
