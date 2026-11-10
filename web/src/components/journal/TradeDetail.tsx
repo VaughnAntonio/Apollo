@@ -62,9 +62,9 @@ export function TradeDetail({ entry: e, onEdit, onDeleted, onChanged }: Props) {
         )}
       </div>
       {confirm && (
-        <div role="alertdialog" className="mb-4 flex flex-wrap items-center gap-3 border-y py-3">
-          <span>Delete this trade? This can't be undone.</span>
-          <button type="button" className={`${btn} border-down text-down`} onClick={() => run(() => api.journal.remove(e.id), onDeleted)}>
+        <div role="alertdialog" aria-labelledby={`delete-${e.id}`} className="mb-4 flex flex-wrap items-center gap-3 border-y py-3">
+          <span id={`delete-${e.id}`}>Delete this trade? This can't be undone.</span>
+          <button type="button" autoFocus className={`${btn} border-down text-down`} onClick={() => run(() => api.journal.remove(e.id), onDeleted)}>
             Yes, delete
           </button>
           <button type="button" className={btn} onClick={() => setConfirm(false)}>

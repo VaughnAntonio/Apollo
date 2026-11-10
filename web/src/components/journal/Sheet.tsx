@@ -20,14 +20,17 @@ type Props = {
   onChanged: () => void
 }
 
+const idle = () => new Promise<never>(() => {}) // never settles, so usePoll keeps its last data
+
 type View = { kind: 'overview' } | { kind: 'trade'; id: number } | { kind: 'new' } | { kind: 'edit'; id: number }
 
 const initialView = (mode: Props['mode'], id: number | null): View =>
   mode === 'new' ? { kind: 'new' } : id !== null ? { kind: 'trade', id } : { kind: 'overview' }
 
 export function Sheet({ open, mode, selectedId, symbol = 'MNQ', onOpenChange, onChanged }: Props) {
-  const list = usePoll(api.journal.list, [open], 60_000)
-  const stats = usePoll(api.journal.stats, [open], 60_000)
+  // nothing to show while closed, so nothing to fetch
+  const list = usePoll(() => (open ? api.journal.list() : idle()), [open], 60_000)
+  const stats = usePoll(() => (open ? api.journal.stats() : idle()), [open], 60_000)
   const symbols = usePoll(api.symbols, [], 3_600_000)
   const [view, setView] = useState<View>(() => initialView(mode, selectedId))
   const [day, setDay] = useState<string | null>(null)

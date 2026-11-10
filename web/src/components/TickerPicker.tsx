@@ -4,6 +4,7 @@ import { api } from '../api/client'
 import type { Sym } from '../api/types'
 import { usePoll } from '../api/usePoll'
 import { set } from '../lib/storage'
+import { ErrorLine } from './State'
 
 const GROUPS: { kind: Sym['kind']; label: string }[] = [
   { kind: 'future', label: 'Futures' },
@@ -11,7 +12,7 @@ const GROUPS: { kind: Sym['kind']; label: string }[] = [
 ]
 
 export function TickerPicker({ value, onChange }: { value: string; onChange: (code: string) => void }) {
-  const { data: symbols = [] } = usePoll(api.symbols, [], 3_600_000)
+  const { data: symbols = [], error } = usePoll(api.symbols, [], 3_600_000)
   const [open, setOpen] = useState(false)
   const [q, setQ] = useState('')
   const [active, setActive] = useState(0)
@@ -60,12 +61,21 @@ export function TickerPicker({ value, onChange }: { value: string; onChange: (co
             value={q}
             onChange={(e) => (setQ(e.target.value), setActive(0))}
             onKeyDown={onKey}
+            role="combobox"
+            aria-expanded="true"
+            aria-controls="symbol-list"
+            aria-activedescendant={matches[active] ? `symbol-${matches[active].code}` : undefined}
             placeholder="Search futures or US stocks"
             aria-label="Search symbols"
             className="block w-full border-b bg-transparent px-3 py-2.5 font-mono outline-none"
           />
-          <div role="listbox" className="max-h-80 overflow-auto pb-1">
-            {matches.length === 0 && <p className="px-3 py-3 text-muted">{`No symbol matches ${q}`}</p>}
+          <div id="symbol-list" role="listbox" className="max-h-80 overflow-auto pb-1">
+            {error && !symbols.length && (
+              <div className="px-3 py-3">
+                <ErrorLine error={error} />
+              </div>
+            )}
+            {matches.length === 0 && !error && <p className="px-3 py-3 text-muted">{`No symbol matches ${q}`}</p>}
             {GROUPS.map((g) => {
               const rows = matches.filter((s) => s.kind === g.kind)
               if (!rows.length) return null
@@ -75,6 +85,7 @@ export function TickerPicker({ value, onChange }: { value: string; onChange: (co
                   {rows.map((s) => (
                     <button
                       key={s.code}
+                      id={`symbol-${s.code}`}
                       type="button"
                       role="option"
                       aria-selected={matches[active]?.code === s.code}

@@ -23,7 +23,9 @@ async function call<T>(path: string, query: Query = {}, init: RequestInit = {}):
   const body = await res.json().catch(() => null)
   if (!res.ok) {
     const detail = body?.detail
-    throw new ApiError(typeof detail === 'string' ? detail : `Request failed (${res.status})`, res.status)
+    // FastAPI sends a string; pydantic validation sends a list of {msg, loc, ...}
+    const msg = typeof detail === 'string' ? detail : Array.isArray(detail) ? detail[0]?.msg : undefined
+    throw new ApiError(typeof msg === 'string' ? msg : `Request failed (${res.status})`, res.status)
   }
   return body as T
 }

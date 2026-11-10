@@ -68,9 +68,9 @@ export function Menu({ page, onNavigate, onJournal, onNewEntry }: Props) {
         className="group flex size-9 shrink-0 flex-col items-center justify-center gap-[5px] rounded-sm border border-ink/70 hover:border-brand hover:text-brand"
       >
         {/* Mecha hamburger: the outer bars shrink to half on hover. */}
-        <span className="h-px w-4 bg-current transition-transform duration-500 ease-[cubic-bezier(0.7,0,0.3,1)] group-hover:scale-x-50" />
+        <span className="h-px w-4 bg-current motion-safe:transition-transform motion-safe:duration-500 ease-[cubic-bezier(0.7,0,0.3,1)] group-hover:scale-x-50" />
         <span className="h-px w-4 bg-current" />
-        <span className="h-px w-4 bg-current transition-transform duration-500 ease-[cubic-bezier(0.7,0,0.3,1)] group-hover:scale-x-50" />
+        <span className="h-px w-4 bg-current motion-safe:transition-transform motion-safe:duration-500 ease-[cubic-bezier(0.7,0,0.3,1)] group-hover:scale-x-50" />
       </Dialog.Trigger>
       <Dialog.Portal>
         <Dialog.Content
@@ -88,7 +88,7 @@ export function Menu({ page, onNavigate, onJournal, onNewEntry }: Props) {
           </div>
 
           <nav aria-label="Pages" className="mt-auto">
-            <ul className="grid grid-cols-2 gap-2 md:grid-cols-6 [&:has(li:hover)>li]:opacity-15 [&>li]:transition-opacity [&>li]:duration-500 [&>li:hover]:opacity-100">
+            <ul className="grid grid-cols-2 gap-2 md:grid-cols-6 [&:has(li:hover)>li]:opacity-15 motion-safe:[&>li]:transition-opacity motion-safe:[&>li]:duration-500 [&>li:hover]:opacity-100">
               {TILES.map((tile, i) => (
                 <li key={tile.label} className="overflow-hidden border">
                   <a

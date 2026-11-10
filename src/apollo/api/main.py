@@ -221,7 +221,14 @@ def create_app(
 
     @app.post("/journal/auto-close")
     def auto_close_open(symbol: str = "MNQ") -> dict:
-        open_ = [e for e in store.list(symbol=known(symbol)) if e["exit"] is None]
+        # only trades auto_close can act on: not imported, with a full plan
+        open_ = [
+            e
+            for e in store.list(symbol=known(symbol))
+            if e["exit"] is None
+            and e["source"] != "imported"
+            and None not in (e["entry"], e["stop"], e["target"], e["side"])
+        ]
         if not open_:
             return {"closed": []}
         since = min(e["opened_at"] for e in open_).astimezone(UTC)  # the bars are in UTC
@@ -282,7 +289,7 @@ def create_app(
     @app.get("/media/{name}")
     def media(name: str) -> FileResponse:
         path = media_dir / name
-        if not MEDIA_NAME.match(name) or not path.is_file():
+        if not MEDIA_NAME.fullmatch(name) or not path.is_file():
             raise HTTPException(404, "no such file")
         return FileResponse(path, media_type="image/png" if name.endswith(".png") else "image/jpeg")
 
@@ -326,8 +333,14 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--root", type=Path, default=Path("data_store"))
     p.add_argument("--web-port", type=int, default=5173, help="the local port the web app runs on")
     a = p.parse_args(argv)
+    # another root (a sandbox) keeps its screenshots and reports beside its own journal
+    dirs = (
+        {}
+        if a.root == Path("data_store")
+        else {"media_dir": a.root / "journal_media", "reports_dir": a.root / "reports"}
+    )
     uvicorn.run(
-        create_app(a.root, web_origin=f"http://localhost:{a.web_port}"),
+        create_app(a.root, web_origin=f"http://localhost:{a.web_port}", **dirs),
         host="127.0.0.1",
         port=a.port,
     )

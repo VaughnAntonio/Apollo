@@ -37,7 +37,7 @@ export function TopBar({ tf, onTf, trades, onTrades, left, chart = true }: Props
         <button type="button" aria-pressed={trades} onClick={() => onTrades(!trades)} className="flex items-center gap-1.5">
           <span
             aria-hidden="true"
-            className={`relative inline-block h-3 w-[22px] rounded-full border border-ink after:absolute after:top-px after:left-px after:size-2 after:rounded-full after:bg-ink after:transition-transform ${trades ? 'after:translate-x-2.5' : ''}`}
+            className={`relative inline-block h-3 w-[22px] rounded-full border border-ink after:absolute after:top-px after:left-px after:size-2 after:rounded-full after:bg-ink motion-safe:after:transition-transform ${trades ? 'after:translate-x-2.5' : ''}`}
           />
           Trades
         </button>

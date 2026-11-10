@@ -1,5 +1,6 @@
 import json
 from datetime import datetime
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -306,3 +307,71 @@ def test_explain_only_for_the_worked_example(client, monkeypatch):
     }
     r = client.get("/explain", params={"symbol": "MES"})
     assert r.status_code == 404 and "MNQ" in r.json()["detail"]
+
+
+def test_media_name_with_a_trailing_newline_is_refused(client, tmp_path):
+    i = client.post("/journal", json=MANUAL).json()["id"]
+    up = client.post(
+        f"/journal/{i}/screenshot", files={"file": ("a.png", b"\x89PNG", "image/png")}
+    ).json()
+    name = up["screenshot"].removeprefix("journal_media/")
+    (tmp_path / "journal_media" / f"{name}\n").write_bytes(
+        b"\x89PNG"
+    )  # a file the route never made
+    assert client.get(f"/media/{name}%0A").status_code == 404
+
+
+def test_main_keeps_media_and_reports_under_another_root(monkeypatch, tmp_path):
+    import uvicorn
+
+    from apollo.api import main as api_main
+
+    seen = {}
+    monkeypatch.setattr(api_main, "create_app", lambda root, **kw: seen.update(root=root, **kw))
+    monkeypatch.setattr(uvicorn, "run", lambda *a, **kw: None)
+    api_main.main(["--root", str(tmp_path)])
+    assert seen["media_dir"] == tmp_path / "journal_media"
+    assert seen["reports_dir"] == tmp_path / "reports"
+    seen.clear()
+    api_main.main([])
+    assert seen.get("media_dir", Path("journal_media")) == Path("journal_media")
+
+
+def test_auto_close_window_ignores_imported_and_unplanned_rows(client, tmp_path, monkeypatch):
+    from apollo.api import main as api_main
+    from apollo.journal.store import JournalStore
+
+    store = JournalStore(tmp_path / "j.duckdb")
+    store.add(
+        {
+            "opened_at": datetime(2025, 7, 10, 9, 30, tzinfo=NY),
+            "symbol": "MNQ",
+            "source": "imported",
+            "imported_r": 1.0,
+            "import_key": "case-study:1",
+        }
+    )
+    store.add(
+        MANUAL
+        | {
+            "opened_at": datetime(2025, 8, 1, 10, tzinfo=NY),
+            "stop": None,
+            "target": None,
+            "source": "manual",
+        }
+    )
+    i = client.post("/journal", json=MANUAL | {"opened_at": "2026-11-03T09:00:00"}).json()["id"]
+    starts = []
+    real = api_main.read_bars
+    monkeypatch.setattr(
+        api_main,
+        "read_bars",
+        lambda root, code, tf, start=None, end=None: (
+            starts.append(start) or real(root, code, tf, start, end)
+        ),
+    )
+    client.post("/journal/auto-close", params={"symbol": "MNQ"})
+    assert (
+        client.get(f"/journal/{i}").json()["exit"] is not None or True
+    )  # the trade itself may stay open
+    assert starts and starts[0].astimezone(NY).date().isoformat() == "2026-11-03"

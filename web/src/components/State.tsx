@@ -5,7 +5,7 @@ export function Skeleton({ rows = 3 }: { rows?: number }) {
   return (
     <div aria-busy="true" aria-label="Loading" className="grid gap-2">
       {Array.from({ length: rows }, (_, i) => (
-        <div key={i} className="h-3 animate-pulse rounded-sm bg-soft" style={{ width: `${90 - i * 15}%` }} />
+        <div key={i} className="h-3 motion-safe:animate-pulse rounded-sm bg-soft" style={{ width: `${90 - i * 15}%` }} />
       ))}
     </div>
   )

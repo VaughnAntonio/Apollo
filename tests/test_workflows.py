@@ -17,7 +17,9 @@ def test_publish_workflow_is_safe():
     assert "permissions:\n  contents: read\n  pages: write\n  id-token: write\n" in text
     assert 'workflows: ["Collect bars"]' in text and "workflow_dispatch:" in text
     assert "group: pages" in text
-    assert "journal.duckdb" not in text.replace("snap_journal.duckdb", "")  # never the private journal
+    assert "journal.duckdb" not in text.replace(
+        "snap_journal.duckdb", ""
+    )  # never the private journal
     assert "--final" not in text  # the holdout stays locked
     blocks = steps(text)
     backtests = [b for b in blocks if "apollo.strategy.backtest" in b]
