@@ -35,3 +35,7 @@ export function tickLabel(sec: number, type: number): string {
   if (type === 2) return nyDay(sec)
   return nyTime(sec)
 }
+
+/** Crosshair time. A daily futures bar opens at 18:00 ET the evening before its session, so daily bars show the session date. */
+export const crosshairLabel = (sec: number, tf: string) =>
+  tf === '1d' ? nyDate(sec + 6 * 3600) : `${nyDate(sec)} ${nyTime(sec)}`

@@ -14,7 +14,7 @@ import { api } from '../api/client'
 import type { Bar, Entry } from '../api/types'
 import { usePoll } from '../api/usePoll'
 import { candleColours, dayDots, mergeBars, palette, snapTo, token, tradeLines, tradeMarkers, type Tf } from '../lib/chart'
-import { nyDate, nyTime, tickLabel } from '../lib/time'
+import { crosshairLabel, tickLabel } from '../lib/time'
 import { Empty, ErrorLine, Skeleton } from './State'
 
 const sec = (t: Time) => t as number
@@ -48,6 +48,8 @@ export function Chart({ symbol, tf, entries = [], openTrade = null, trades = tru
     ids: new Map(),
   })
   const clickRef = useRef(onMarkerClick)
+  const tfRef = useRef(tf)
+  tfRef.current = tf
   clickRef.current = onMarkerClick
   const box = useRef<HTMLDivElement>(null)
   const chartRef = useRef<{ chart: IChartApi; series: ISeriesApi<'Candlestick'> } | null>(null)
@@ -69,7 +71,7 @@ export function Chart({ symbol, tf, entries = [], openTrade = null, trades = tru
     if (!box.current) return
     const chart = createChart(box.current, {
       autoSize: true,
-      localization: { timeFormatter: (t: Time) => `${nyDate(sec(t))} ${nyTime(sec(t))}` },
+      localization: { timeFormatter: (t: Time) => crosshairLabel(sec(t), tfRef.current) },
       timeScale: {
         timeVisible: true,
         tickMarkFormatter: (t: Time, type: number) => tickLabel(sec(t), type),

@@ -4,6 +4,7 @@ import { usePoll } from './api/usePoll'
 import { Chart } from './components/Chart'
 import { Menu, useHashPage, type Page } from './components/Menu'
 import { Placeholder } from './components/Placeholder'
+import { Sheet } from './components/journal/Sheet'
 import { Rail } from './components/Rail'
 import { TickerPicker } from './components/TickerPicker'
 import { TopBar } from './components/TopBar'
@@ -22,7 +23,7 @@ export type SheetState = { open: boolean; mode: 'view' | 'new'; id: number | nul
 
 export default function App() {
   const [page, go] = useHashPage()
-  const [, setSheet] = useState<SheetState>({ open: false, mode: 'view', id: null })
+  const [sheet, setSheet] = useState<SheetState>({ open: false, mode: 'view', id: null })
   const [symbol, setSymbol] = useState(() => get('apollo.symbol', 'MNQ'))
   const [tf, setTf] = useState<Tf>(storedTf)
   const [trades, setTrades] = useState(() => get('apollo.trades', 'on') !== 'off')
@@ -77,7 +78,7 @@ export default function App() {
             openTrade={openTrade}
             trades={trades}
             onLastClose={setLastClose}
-          onMarkerClick={(id) => setSheet({ open: true, mode: "view", id })}
+          onMarkerClick={(id) => setSheet({ open: true, mode: 'view', id })}
           />
           <Rail
             symbol={symbol}
@@ -92,6 +93,14 @@ export default function App() {
           <Placeholder title={TITLES[page]} />
         </main>
       )}
+      <Sheet
+        open={sheet.open}
+        mode={sheet.mode}
+        selectedId={sheet.id}
+        symbol={symbol}
+        onOpenChange={(open) => setSheet((s) => ({ ...s, open }))}
+        onChanged={journal.refresh}
+      />
       <footer className="flex flex-wrap justify-between gap-x-4 border-t px-5 py-2.5 font-mono text-[11px] text-muted">
         <span>Research tool. Not financial advice.</span>
         <span>Data: Yahoo Finance</span>

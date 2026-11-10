@@ -28,3 +28,12 @@ it('axis ticks show the year, the month, the day or the time by tick type', () =
   expect(tickLabel(s, 2)).toBe('1 Jan')
   expect(tickLabel(s, 3)).toBe('10:00')
 })
+
+import { crosshairLabel } from '../../src/lib/time'
+
+it('the daily crosshair shows the session date, not the 18:00 ET open of the evening before', () => {
+  const openPrevEvening = Date.UTC(2024, 9, 7, 22, 0) / 1000 // 18:00 ET on 7 Oct opens the 8 Oct session
+  expect(crosshairLabel(openPrevEvening, '1d')).toBe('2024-10-08')
+  expect(crosshairLabel(Date.UTC(2024, 9, 8, 4, 0) / 1000, '1d')).toBe('2024-10-08') // a stock bar at midnight ET
+  expect(crosshairLabel(openPrevEvening, '1h')).toBe('2024-10-07 18:00')
+})
