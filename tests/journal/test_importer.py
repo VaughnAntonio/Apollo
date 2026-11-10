@@ -22,3 +22,13 @@ def test_grade_family_and_import_twice(tmp_path):
     import_case_study(s, FIXTURE)
     assert {e["grade"] for e in s.list(source="imported")} <= {None, "A", "B", "C", "E"}
     assert import_case_study(s, FIXTURE) == 0 and len(s.list()) == 51
+
+
+def test_importer_cli_adds_once(tmp_path, capsys):
+    from apollo.journal.importer import main
+
+    db = tmp_path / "j.duckdb"
+    assert main(["--csv-dir", str(FIXTURE), "--db", str(db)]) == 0
+    assert capsys.readouterr().out.strip() == "added 51 rows"
+    main(["--csv-dir", str(FIXTURE), "--db", str(db)])
+    assert capsys.readouterr().out.strip() == "added 0 rows"

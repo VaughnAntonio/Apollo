@@ -22,12 +22,12 @@ from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from apollo.config import load_symbols
+from apollo.data.serve import TIMEFRAMES, bars_json, read_tf
 from apollo.data.store import read_bars
 from apollo.journal.stats import calendar, journal_stats
 from apollo.journal.store import JournalStore
 from apollo.journal.trades import auto_close, close_trade, take_trade
 
-TIMEFRAMES = ("1m", "5m", "15m", "1h", "4h", "1d")
 DEV_ORIGIN = "http://localhost:5173"  # Plan 6's Vite dev server; nothing else may call the API
 MAX_SHOT = 5 * 1024 * 1024
 IMAGE_TYPES = {"image/png": "png", "image/jpeg": "jpg"}
@@ -177,18 +177,7 @@ def create_app(
         known(symbol)
         if tf not in TIMEFRAMES:
             raise HTTPException(422, f"tf must be one of {TIMEFRAMES}")
-        if tf == "4h":
-            from apollo.fractal.model import complete_4h
-
-            df = complete_4h(read_bars(root, symbol, "1h", start, end))
-        else:
-            df = read_bars(root, symbol, tf, start, end)  # type: ignore[arg-type]
-        return [
-            {"time": int(t.timestamp()), "open": o, "high": h, "low": lo, "close": c, "volume": v}
-            for t, o, h, lo, c, v in df.select(
-                "ts", "open", "high", "low", "close", "volume"
-            ).iter_rows()
-        ]
+        return bars_json(read_tf(root, symbol, tf, start, end))
 
     @app.get("/forecast")
     def forecast(symbol: str) -> dict:

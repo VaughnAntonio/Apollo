@@ -14,3 +14,4 @@ dist/
 /reports/
 journal_media/
 docs/reviews/journal-export*.csv
+web/public/snapshot/

@@ -2,6 +2,7 @@
 so those rows are flagged `scaled` and keep the case study's own R and P&L. Prices, sizes and the
 trade direction weren't published, so they stay empty ("Not recorded")."""
 
+import argparse
 import csv
 from datetime import datetime, time
 from pathlib import Path
@@ -41,3 +42,17 @@ def import_case_study(store: JournalStore, csv_dir: Path) -> int:
             )
             added += 1
     return added
+
+
+def main(argv: list[str] | None = None) -> int:
+    p = argparse.ArgumentParser(description="Import the case study's public trades.")
+    p.add_argument("--csv-dir", type=Path, required=True, help="the folder with trades_public.csv")
+    p.add_argument("--db", type=Path, default=Path("data_store/journal.duckdb"))
+    a = p.parse_args(argv)
+    a.db.parent.mkdir(parents=True, exist_ok=True)
+    print(f"added {import_case_study(JournalStore(a.db), a.csv_dir)} rows")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
