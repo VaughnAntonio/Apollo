@@ -21,8 +21,8 @@ export function Block({ label, children, note }: { label: string; children: Reac
   )
 }
 
-export const table = 'w-full border-collapse text-left [&_td]:border-t [&_td]:py-1.5 [&_td]:whitespace-nowrap [&_td]:pr-4 [&_th]:pb-2 [&_th]:pr-4 [&_th]:font-mono [&_th]:text-[10px] [&_th]:font-medium [&_th]:tracking-widest [&_th]:text-muted [&_th]:uppercase'
-export const num = 'font-mono tabular-nums'
+export const table = 'w-full border-collapse text-left [&_td]:border-t [&_td]:py-1.5 [&_td]:pr-4 [&_th]:pb-2 [&_th]:pr-4 [&_th]:font-mono [&_th]:text-[10px] [&_th]:font-medium [&_th]:tracking-widest [&_th]:text-muted [&_th]:uppercase'
+export const num = 'font-mono tabular-nums whitespace-nowrap'
 
 export const dash = '–'
 export const r2 = (x: number | null | undefined) =>

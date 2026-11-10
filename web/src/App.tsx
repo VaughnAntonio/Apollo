@@ -3,9 +3,9 @@ import { api } from './api/client'
 import { usePoll } from './api/usePoll'
 import { Chart } from './components/Chart'
 import { ErrorBoundary } from './components/ErrorBoundary'
-import { Menu, useHashPage, type Page } from './components/Menu'
-import { Placeholder } from './components/Placeholder'
+import { Menu, useHashPage } from './components/Menu'
 import { Backtest } from './components/pages/Backtest'
+import { CaseStudy } from './components/pages/CaseStudy'
 import { Models } from './components/pages/Models'
 import { Sheet } from './components/journal/Sheet'
 import { Rail } from './components/Rail'
@@ -20,8 +20,6 @@ const storedTf = (): Tf => {
   const t = get('apollo.tf', '5m') as Tf
   return TIMEFRAMES.some((x) => x.tf === t) ? t : '5m'
 }
-
-const TITLES: Record<Exclude<Page, 'chart'>, string> = { backtest: 'Backtest', models: 'Models', 'case-study': 'Case study' }
 
 export type SheetState = { open: boolean; mode: 'view' | 'new'; id: number | null }
 
@@ -101,7 +99,7 @@ export default function App() {
           ) : page === 'models' ? (
             <Models symbol={symbol} />
           ) : (
-            <Placeholder title={TITLES[page]} />
+            <CaseStudy />
           )}
         </main>
       )}
