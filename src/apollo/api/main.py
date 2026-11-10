@@ -131,10 +131,11 @@ def create_app(
     reports_dir: Path = Path("reports"),
     signal_fn: Callable[[Path, str, datetime], dict[str, Any]] = _default_signal,
     forecast_fn: Callable[[Path, str], dict[str, Any]] = _default_forecast,
+    web_origin: str = DEV_ORIGIN,
 ) -> FastAPI:
     app = FastAPI(title="Apollo Predictor", description="Research tool. Not financial advice.")
     app.add_middleware(
-        CORSMiddleware, allow_origins=[DEV_ORIGIN], allow_methods=["*"], allow_headers=["*"]
+        CORSMiddleware, allow_origins=[web_origin], allow_methods=["*"], allow_headers=["*"]
     )
     # CORS only hides responses; these two stop other sites and DNS rebinding reaching the journal
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost"])
@@ -142,7 +143,7 @@ def create_app(
     @app.middleware("http")
     async def same_origin_only(request: Request, call_next):
         origin = request.headers.get("origin")
-        if origin is not None and origin != DEV_ORIGIN:
+        if origin is not None and origin != web_origin:
             return JSONResponse({"detail": "origin not allowed"}, status_code=403)
         return await call_next(request)
 
@@ -327,8 +328,13 @@ def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--port", type=int, default=8000)
     p.add_argument("--root", type=Path, default=Path("data_store"))
+    p.add_argument("--web-port", type=int, default=5173, help="the local port the web app runs on")
     a = p.parse_args(argv)
-    uvicorn.run(create_app(a.root), host="127.0.0.1", port=a.port)
+    uvicorn.run(
+        create_app(a.root, web_origin=f"http://localhost:{a.web_port}"),
+        host="127.0.0.1",
+        port=a.port,
+    )
     return 0
 
 

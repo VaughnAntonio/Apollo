@@ -229,3 +229,12 @@ def test_media_serves_only_uploaded_names(client):
     assert got.status_code == 200 and got.headers["content-type"] == "image/png"
     for bad in ["../j.duckdb", "x.png", "1-abc.png", "..%2Fj.duckdb"]:
         assert client.get(f"/media/{bad}").status_code == 404
+
+
+def test_web_origin_can_move_to_another_local_port(tmp_path):
+    app = create_app(
+        tmp_path, journal_path=tmp_path / "j.duckdb", web_origin="http://localhost:5174"
+    )
+    c = TestClient(app, base_url="http://localhost")
+    assert c.get("/healthz", headers={"Origin": "http://localhost:5174"}).status_code == 200
+    assert c.get("/healthz", headers={"Origin": "http://localhost:5173"}).status_code == 403
