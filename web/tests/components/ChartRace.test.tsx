@@ -19,7 +19,7 @@ vi.mock('lightweight-charts', () => {
     }),
     applyOptions: vi.fn(),
     createPriceLine: vi.fn(),
-    removePriceLine: vi.fn(),
+    removePriceLine: vi.fn(), attachPrimitive: vi.fn(), detachPrimitive: vi.fn(),
   }
   const chart = {
     addSeries: vi.fn(() => series),

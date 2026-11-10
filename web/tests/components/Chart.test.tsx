@@ -4,7 +4,7 @@ import { Chart } from '../../src/components/Chart'
 import { mockApi } from '../helpers'
 
 vi.mock('lightweight-charts', () => {
-  const series = { setData: vi.fn(), update: vi.fn(), applyOptions: vi.fn(), createPriceLine: vi.fn(), removePriceLine: vi.fn() }
+  const series = { setData: vi.fn(), update: vi.fn(), applyOptions: vi.fn(), createPriceLine: vi.fn(), removePriceLine: vi.fn(), attachPrimitive: vi.fn(), detachPrimitive: vi.fn() }
   const chart = {
     addSeries: vi.fn(() => series),
     applyOptions: vi.fn(),
