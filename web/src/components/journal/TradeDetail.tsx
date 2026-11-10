@@ -1,5 +1,6 @@
 import { useRef, useState, type ReactNode } from 'react'
 import { api, ApiError, mediaUrl } from '../../api/client'
+import { isStatic } from '../../lib/mode'
 import type { Entry } from '../../api/types'
 import { nyDateTime } from '../../lib/time'
 import { fmtPrice, fmtR, fmtUsd, NOT_RECORDED } from '../../lib/trade'
@@ -25,7 +26,7 @@ export function TradeDetail({ entry: e, onEdit, onDeleted, onChanged }: Props) {
   const [confirm, setConfirm] = useState(false)
   const [error, setError] = useState<ApiError | null>(null)
   const file = useRef<HTMLInputElement>(null)
-  const editable = e.source !== 'imported'
+  const editable = e.source !== 'imported' && !isStatic()
   const snap = (e.model_snapshot ?? null) as Snapshot | null
 
   const run = async (f: () => Promise<unknown>, after: () => void) => {

@@ -11,6 +11,7 @@ import { TickerPicker } from './components/TickerPicker'
 import { TopBar } from './components/TopBar'
 import { Wordmark } from './components/Wordmark'
 import { TIMEFRAMES, type Tf } from './lib/chart'
+import { isStatic } from './lib/mode'
 import { get, set } from './lib/storage'
 
 const storedTf = (): Tf => {
@@ -39,7 +40,7 @@ export default function App() {
     [journal.data, symbol],
   )
   // while a trade is open, let the API check later bars for its stop, target or flat time
-  const openId = openTrade && openTrade.exit === null ? openTrade.id : null
+  const openId = openTrade && openTrade.exit === null && !isStatic() ? openTrade.id : null
   const refreshJournal = journal.refresh
   const autoClose = usePoll(
     async () => (openId === null ? { closed: [] } : api.journal.autoClose(symbol)),

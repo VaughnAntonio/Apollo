@@ -1,5 +1,6 @@
 import { Dialog } from 'radix-ui'
 import { useEffect, useState, type CSSProperties, type MouseEvent } from 'react'
+import { isStatic } from '../lib/mode'
 import { useTheme, type Theme } from '../lib/theme'
 import { EndMark } from './EndMark'
 import { Wordmark } from './Wordmark'
@@ -123,6 +124,7 @@ export function Menu({ page, onNavigate, onJournal, onNewEntry }: Props) {
                 </div>
               </div>
             </div>
+            {!isStatic() && (
             <div className="overflow-hidden">
               <button
                 type="button"
@@ -135,6 +137,7 @@ export function Menu({ page, onNavigate, onJournal, onNewEntry }: Props) {
                 <span className="text-lg">New journal entry</span>
               </button>
             </div>
+            )}
           </div>
         </Dialog.Content>
       </Dialog.Portal>

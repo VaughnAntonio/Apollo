@@ -2,6 +2,7 @@ import { Dialog } from 'radix-ui'
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '../../api/client'
 import { usePoll } from '../../api/usePoll'
+import { isStatic } from '../../lib/mode'
 import { nyDate, toSec } from '../../lib/time'
 import { EndMark } from '../EndMark'
 import { ErrorLine, Skeleton } from '../State'
@@ -60,6 +61,7 @@ export function Sheet({ open, mode, selectedId, symbol = 'MNQ', onOpenChange, on
               <button type="button" className="font-semibold" onClick={() => (setDay(null), setView({ kind: 'overview' }))}>
                 Journal
               </button>
+              {!isStatic() && (
               <button
                 type="button"
                 onClick={() => setView({ kind: 'new' })}
@@ -67,6 +69,7 @@ export function Sheet({ open, mode, selectedId, symbol = 'MNQ', onOpenChange, on
               >
                 New
               </button>
+              )}
             </div>
             {day && (
               <button type="button" onClick={() => setDay(null)} className="w-full border-b px-5 py-2 text-left font-mono text-[11px] text-muted">

@@ -2,6 +2,7 @@ import { useState, type FormEvent, type ReactNode } from 'react'
 import { api, ApiError } from '../api/client'
 import type { CheckRow, Entry, Signal } from '../api/types'
 import { usePoll } from '../api/usePoll'
+import { isStatic } from '../lib/mode'
 import { fmtPct, fmtPrice, fmtR, message, openR, parseNum, parseSize } from '../lib/trade'
 import { Empty, ErrorLine, Skeleton } from './State'
 
@@ -213,7 +214,7 @@ function SignalPanel({ symbol, signal, stale, onTaken }: SignalProps) {
       <div className="mt-1 h-[3px] bg-soft">
         <i className="block h-full bg-ink" style={{ width: `${Math.min(100, (signal.risk_of_limit ?? 0) * 100)}%` }} />
       </div>
-      {!stale && <TakeTrade symbol={symbol} signal={signal} onTaken={onTaken} />}
+      {!stale && !isStatic() && <TakeTrade symbol={symbol} signal={signal} onTaken={onTaken} />}
     </div>
   )
 }
