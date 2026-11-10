@@ -88,10 +88,16 @@ export type JournalIn = {
   notes?: string
 }
 
-export type JournalPatch = Partial<Omit<JournalIn, 'opened_at' | 'symbol'>> & {
-  closed_at?: string
-  exit?: number
-  exit_reason?: string
+/** null clears a field. */
+export type JournalPatch = {
+  [K in keyof Omit<JournalIn, 'opened_at' | 'symbol' | 'side' | 'size' | 'tags'>]?: JournalIn[K] | null
+} & {
+  side?: Side
+  size?: number
+  tags?: string[]
+  closed_at?: string | null
+  exit?: number | null
+  exit_reason?: string | null
   needs_confirm?: boolean
 }
 

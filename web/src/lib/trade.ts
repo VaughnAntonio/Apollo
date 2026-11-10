@@ -20,3 +20,20 @@ export const fmtPct = (x: number | null) => (x === null ? NOT_RECORDED : `${(x *
 
 const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
 export const fmtUsd = (x: number | null) => (x === null ? NOT_RECORDED : money.format(x).replace('-', '−'))
+
+/** A typed number, or undefined when blank. Throws a readable error for anything else. */
+export function parseNum(label: string, v: string): number | undefined {
+  if (v.trim() === '') return undefined
+  const n = Number(v)
+  if (!Number.isFinite(n)) throw new Error(`${label} must be a number`)
+  return n
+}
+
+export function parseSize(v: string): number {
+  const n = Number(v)
+  if (v.trim() === '' || !Number.isInteger(n) || n <= 0) throw new Error('Contracts must be a whole number above 0')
+  return n
+}
+
+/** Any thrown value as an ApiError-shaped message for ErrorLine. */
+export const message = (err: unknown) => (err instanceof Error ? err.message : String(err))

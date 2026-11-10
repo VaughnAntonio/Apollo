@@ -2,6 +2,7 @@ import { useState, type FormEvent, type ReactNode } from 'react'
 import { ApiError } from '../../api/client'
 import type { Entry, Grade, JournalIn, JournalPatch, Side, Stage } from '../../api/types'
 import { nyDate, nyTime, toNaiveIso, toSec } from '../../lib/time'
+import { parseNum, parseSize } from '../../lib/trade'
 import { ErrorLine } from '../State'
 
 export type EntryFormState = {
@@ -40,19 +41,8 @@ export const formFrom = (e: Entry): EntryFormState => ({
 })
 
 const LABELS: Record<string, string> = { entry: 'Entry', stop: 'Stop', target: 'Target', exit: 'Exit', fees: 'Fees' }
-
-function num(field: string, v: string): number | undefined {
-  if (v.trim() === '') return undefined
-  const n = Number(v)
-  if (!Number.isFinite(n)) throw new Error(`${LABELS[field] ?? field} must be a number`)
-  return n
-}
-
-function size(v: string): number {
-  const n = Number(v)
-  if (!Number.isInteger(n) || n <= 0) throw new Error('Contracts must be a whole number above 0')
-  return n
-}
+const num = (field: string, v: string) => parseNum(LABELS[field] ?? field, v)
+const size = parseSize
 
 const tagList = (v: string) => v.split(',').map((t) => t.trim()).filter(Boolean)
 
@@ -73,26 +63,31 @@ export function entryBody(f: EntryFormState): JournalIn {
   return body
 }
 
-/** The PATCH body: only fields that changed. A new exit closes the trade by hand. */
+/** The PATCH body: only fields that changed. A cleared field is sent as null so the API clears it. */
 export function patchBody(f: EntryFormState, e: Entry): JournalPatch {
   const before = formFrom(e)
   const out: JournalPatch = {}
   const changed = (k: keyof EntryFormState) => f[k] !== before[k]
+  const text = (v: string) => v.trim() || null
   if (changed('side')) out.side = f.side
-  for (const k of ['entry', 'stop', 'target', 'fees'] as const) if (changed(k)) out[k] = num(k, f[k])
+  for (const k of ['entry', 'stop', 'target', 'fees'] as const) if (changed(k)) out[k] = num(k, f[k]) ?? null
   if (changed('size')) out.size = size(f.size)
-  if (changed('account')) out.account = f.account.trim() || undefined
-  if (changed('stage')) out.stage = f.stage || undefined
-  if (changed('strategy')) out.strategy = f.strategy.trim() || undefined
-  if (changed('grade')) out.grade = f.grade || undefined
+  if (changed('account')) out.account = text(f.account)
+  if (changed('stage')) out.stage = f.stage || null
+  if (changed('strategy')) out.strategy = text(f.strategy)
+  if (changed('grade')) out.grade = f.grade || null
   if (changed('tags')) out.tags = tagList(f.tags)
-  if (changed('notes')) out.notes = f.notes
-  if (changed('exit') || changed('closed_at')) {
-    out.exit = num('exit', f.exit)
-    if (f.closed_at) out.closed_at = toNaiveIso(f.closed_at)
-    out.exit_reason = 'manual'
-    out.needs_confirm = false
+  if (changed('notes')) out.notes = text(f.notes)
+  if (changed('exit')) {
+    const exit = num('exit', f.exit)
+    if (exit === undefined) {
+      // no exit means the trade is open again, whatever closed it before
+      Object.assign(out, { exit: null, closed_at: null, exit_reason: null, needs_confirm: false })
+      return out
+    }
+    Object.assign(out, { exit, exit_reason: 'manual', needs_confirm: false })
   }
+  if (changed('closed_at')) out.closed_at = f.closed_at ? toNaiveIso(f.closed_at) : null
   return out
 }
 

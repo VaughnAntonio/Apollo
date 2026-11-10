@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { api } from './api/client'
 import { usePoll } from './api/usePoll'
 import { Chart } from './components/Chart'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { Menu, useHashPage, type Page } from './components/Menu'
 import { Placeholder } from './components/Placeholder'
 import { Sheet } from './components/journal/Sheet'
@@ -71,15 +72,17 @@ export default function App() {
       />
       {page === 'chart' ? (
         <main className="grid min-h-0 grid-cols-1 md:grid-cols-[1fr_260px]">
-          <Chart
-            symbol={symbol}
-            tf={tf}
-            entries={journal.data}
-            openTrade={openTrade}
-            trades={trades}
-            onLastClose={setLastClose}
-          onMarkerClick={(id) => setSheet({ open: true, mode: 'view', id })}
-          />
+          <ErrorBoundary label="chart">
+            <Chart
+              symbol={symbol}
+              tf={tf}
+              entries={journal.data}
+              openTrade={openTrade}
+              trades={trades}
+              onLastClose={setLastClose}
+            onMarkerClick={(id) => setSheet({ open: true, mode: 'view', id })}
+            />
+          </ErrorBoundary>
           <Rail
             symbol={symbol}
             openTrade={openTrade}

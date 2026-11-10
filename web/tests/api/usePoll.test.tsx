@@ -40,3 +40,15 @@ it('refetches when its deps change', async () => {
   rerender({ s: 'MES' })
   await vi.waitFor(() => expect(result.current.data).toBe('MES'))
 })
+
+it('an hourly poll that fails retries every minute until it succeeds', async () => {
+  vi.useFakeTimers()
+  const fn = vi.fn().mockRejectedValueOnce(new ApiError('down', 0)).mockResolvedValue('ok')
+  const { result } = renderHook(() => usePoll(fn, [], 3_600_000))
+  await act(() => vi.advanceTimersByTimeAsync(0))
+  expect(result.current.error?.status).toBe(0)
+  await act(() => vi.advanceTimersByTimeAsync(60_000))
+  expect(result.current.data).toBe('ok')
+  await act(() => vi.advanceTimersByTimeAsync(600_000))
+  expect(fn).toHaveBeenCalledTimes(2) // back on the hourly timer once it works
+})

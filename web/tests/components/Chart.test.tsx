@@ -32,3 +32,13 @@ it('shows how to start the API when it is down', async () => {
   render(<Chart symbol="MNQ" tf="5m" />)
   expect(await screen.findByText('Start the API: python -m apollo.api.main')).toBeTruthy()
 })
+
+it('marks the chart as stale when a later poll fails', async () => {
+  mockApi({ '/bars': [{ time: 100, open: 1, high: 1, low: 1, close: 1, volume: 1 }] })
+  render(<Chart symbol="MNQ" tf="5m" />)
+  await vi.waitFor(() => expect(screen.queryByLabelText('Loading')).toBeNull())
+  vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')))
+  Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true })
+  document.dispatchEvent(new Event('visibilitychange'))
+  expect(await screen.findByText('Start the API: python -m apollo.api.main')).toBeTruthy()
+})

@@ -260,3 +260,23 @@ def test_concurrent_first_calls_share_one_forecast(tmp_path):
             pool.map(lambda _: c.get("/forecast", params={"symbol": "MNQ"}).status_code, range(4))
         )
     assert codes == [200] * 4 and calls == ["MNQ"]
+
+
+def test_patch_null_reopens_a_trade(client):
+    i = client.post("/journal", json=MANUAL).json()["id"]
+    client.post(f"/journal/{i}/close", json={"exit": 105.0, "reason": "target"})
+    body = {
+        "exit": None,
+        "closed_at": None,
+        "exit_reason": None,
+        "needs_confirm": False,
+        "target": None,
+    }
+    e = client.patch(f"/journal/{i}", json=body).json()
+    assert (e["exit"], e["closed_at"], e["exit_reason"], e["target"], e["r"]) == (
+        None,
+        None,
+        None,
+        None,
+        None,
+    )

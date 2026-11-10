@@ -37,3 +37,20 @@ it('patchBody sends only what changed, and an exit closes the trade by hand', ()
   })
   expect(patchBody(f, e)).toEqual({})
 })
+
+it('clearing a field sends null so the API clears it', () => {
+  const e = entry({ target: 105, account: 'APEX 50k', grade: 'A' })
+  expect(patchBody({ ...formFrom(e), target: '', account: '', grade: '' }, e)).toEqual({ target: null, account: null, grade: null })
+})
+
+it('clearing the exit reopens the trade instead of confirming an auto-close', () => {
+  const e = entry({ exit: 99.75, closed_at: '2026-11-03T16:30:00Z', exit_reason: 'stop_auto', needs_confirm: true })
+  expect(patchBody({ ...formFrom(e), exit: '', closed_at: '' }, e)).toEqual({
+    exit: null,
+    closed_at: null,
+    exit_reason: null,
+    needs_confirm: false,
+  })
+  // touching only the close time keeps the reason
+  expect(patchBody({ ...formFrom(e), closed_at: '2026-11-03T11:45' }, e)).toEqual({ closed_at: '2026-11-03T11:45:00' })
+})

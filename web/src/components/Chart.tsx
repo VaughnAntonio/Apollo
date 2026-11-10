@@ -53,15 +53,19 @@ export function Chart({ symbol, tf, entries = [], openTrade = null, trades = tru
   clickRef.current = onMarkerClick
   const box = useRef<HTMLDivElement>(null)
   const chartRef = useRef<{ chart: IChartApi; series: ISeriesApi<'Candlestick'> } | null>(null)
-  const bars = useRef<{ key: string; list: Bar[]; drawn: number }>({ key: '', list: [], drawn: 0 })
+  const bars = useRef<{ key: string; list: Bar[] }>({ key: '', list: [] })
+  // what the series holds; only the draw effect writes it
+  const drawnTo = useRef<{ key: string; time: number }>({ key: '', time: 0 })
+  const seq = useRef(0)
   const key = `${symbol}|${tf}`
 
   const poll = usePoll(
     async () => {
-      const mine = bars.current.key === key ? bars.current : { key, list: [], drawn: 0 }
-      const last = mine.list.at(-1)?.time
-      const fresh = await api.bars(symbol, tf, last)
-      bars.current = { ...mine, list: mergeBars(mine.list, fresh) }
+      const mine = ++seq.current
+      const start = bars.current.key === key ? bars.current : { key, list: [] }
+      const fresh = await api.bars(symbol, tf, start.list.at(-1)?.time)
+      if (mine !== seq.current) return bars.current.list // a newer poll started meanwhile; it wins
+      bars.current = { key, list: mergeBars(start.list, fresh) }
       return bars.current.list
     },
     [key],
@@ -104,14 +108,15 @@ export function Chart({ symbol, tf, entries = [], openTrade = null, trades = tru
     const list = poll.data
     if (!c || !list || bars.current.key !== key) return
     const data = list.map((b) => ({ ...b, time: b.time as UTCTimestamp }))
-    if (bars.current.drawn === 0) {
-      c.series.setData(data)
-      c.chart.timeScale().fitContent()
+    const last = list.at(-1)?.time ?? 0
+    const at = drawnTo.current
+    if (at.key !== key || last < at.time) {
+      c.series.setData(data) // a new symbol or timeframe, or a shorter list: redraw everything
+      if (at.key !== key) c.chart.timeScale().fitContent()
     } else {
-      const from = bars.current.drawn
-      for (const b of data) if (b.time >= from) c.series.update(b) // lightweight-charts refuses older times
+      for (const b of data) if (b.time >= at.time) c.series.update(b) // lightweight-charts refuses older times
     }
-    bars.current.drawn = list.at(-1)?.time ?? 0
+    drawnTo.current = { key, time: last }
   }, [poll.data, key])
 
   useEffect(() => {
@@ -143,6 +148,11 @@ export function Chart({ symbol, tf, entries = [], openTrade = null, trades = tru
   return (
     <div className="relative min-h-[440px] min-w-0">
       <div ref={box} className="absolute inset-0" />
+      {poll.error && !!poll.data?.length && (
+        <div className="absolute top-2 left-3 z-10 bg-bg/90 px-2 py-1">
+          <ErrorLine error={poll.error} />
+        </div>
+      )}
       {(poll.loading && !poll.data) || empty || (poll.error && !poll.data?.length) ? (
         <div className="absolute inset-0 z-10 grid place-items-center bg-bg p-6">
           {poll.error && !poll.data?.length ? (

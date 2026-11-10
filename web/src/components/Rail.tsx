@@ -2,7 +2,7 @@ import { useState, type FormEvent, type ReactNode } from 'react'
 import { api, ApiError } from '../api/client'
 import type { CheckRow, Entry, Signal } from '../api/types'
 import { usePoll } from '../api/usePoll'
-import { fmtPct, fmtPrice, fmtR, openR } from '../lib/trade'
+import { fmtPct, fmtPrice, fmtR, message, openR, parseNum, parseSize } from '../lib/trade'
 import { Empty, ErrorLine, Skeleton } from './State'
 
 const STEPS: Record<string, string> = {
@@ -87,11 +87,13 @@ function TakeTrade({ symbol, signal, onTaken }: { symbol: string; signal: Signal
     setBusy(true)
     setError(null)
     try {
-      const { id } = await api.journal.take(symbol, { fill: Number(form.fill), size: Number(form.size) })
+      const fill = parseNum('Fill', form.fill)
+      const size = form.size.trim() === '' ? undefined : parseSize(form.size)
+      const { id } = await api.journal.take(symbol, { ...(fill === undefined ? {} : { fill }), ...(size === undefined ? {} : { size }) })
       setForm(null)
       onTaken(id)
     } catch (err) {
-      setError(err instanceof ApiError ? err : new ApiError(String(err), -1))
+      setError(err instanceof ApiError ? err : new ApiError(message(err), -1))
     } finally {
       setBusy(false)
     }
@@ -128,14 +130,16 @@ function OpenTrade({ trade, lastClose, onChanged }: { trade: Entry; lastClose: n
   const at = done ? trade.exit : lastClose
   const r = at === null ? null : openR(trade, at)
 
-  const close = async (body: { exit: number; at?: string; reason?: string }) => {
+  const close = async (body: { exit: number | string; at?: string; reason?: string }) => {
     setError(null)
     try {
-      await api.journal.close(trade.id, body)
+      const exit = typeof body.exit === 'number' ? body.exit : parseNum('Exit', body.exit)
+      if (exit === undefined) throw new Error('Exit must be a number')
+      await api.journal.close(trade.id, { ...body, exit })
       setExit(null)
       onChanged()
     } catch (err) {
-      setError(err instanceof ApiError ? err : new ApiError(String(err), -1))
+      setError(err instanceof ApiError ? err : new ApiError(message(err), -1))
     }
   }
 
@@ -169,7 +173,7 @@ function OpenTrade({ trade, lastClose, onChanged }: { trade: Entry; lastClose: n
       ) : (
         <form
           className="mt-3 grid gap-2"
-          onSubmit={(e) => (e.preventDefault(), close({ exit: Number(exit), reason: 'manual' }))}
+          onSubmit={(e) => (e.preventDefault(), close({ exit, reason: 'manual' }))}
         >
           <label className="grid gap-1 text-muted">
             Exit
@@ -190,7 +194,9 @@ function OpenTrade({ trade, lastClose, onChanged }: { trade: Entry; lastClose: n
   )
 }
 
-function SignalPanel({ symbol, signal, onTaken }: { symbol: string; signal: Signal; onTaken: (id: number) => void }) {
+type SignalProps = { symbol: string; signal: Signal; stale: boolean; onTaken: (id: number) => void }
+
+function SignalPanel({ symbol, signal, stale, onTaken }: SignalProps) {
   if (signal.status === 'no_model') return <Empty>No signal for this symbol</Empty>
   if (signal.status !== 'trigger') return <Empty>No trade signal</Empty>
   const long = signal.direction === 'bull'
@@ -207,7 +213,7 @@ function SignalPanel({ symbol, signal, onTaken }: { symbol: string; signal: Sign
       <div className="mt-1 h-[3px] bg-soft">
         <i className="block h-full bg-ink" style={{ width: `${Math.min(100, (signal.risk_of_limit ?? 0) * 100)}%` }} />
       </div>
-      <TakeTrade symbol={symbol} signal={signal} onTaken={onTaken} />
+      {!stale && <TakeTrade symbol={symbol} signal={signal} onTaken={onTaken} />}
     </div>
   )
 }
@@ -220,13 +226,25 @@ export function Rail({ symbol, openTrade, lastClose, onTaken, onChanged }: Props
   return (
     <aside className="border-t md:overflow-auto md:border-t-0 md:border-l">
       <Section label="Top-down">
-        {sig.data ? <Checklist signal={sig.data} /> : sig.error ? <ErrorLine error={sig.error} /> : <Skeleton rows={5} />}
+        {sig.data ? (
+          <>
+            <Checklist signal={sig.data} />
+            {sig.error && <ErrorLine error={sig.error} />}
+          </>
+        ) : sig.error ? (
+          <ErrorLine error={sig.error} />
+        ) : (
+          <Skeleton rows={5} />
+        )}
       </Section>
       <Section label={openTrade ? 'Open trade' : 'Signal'}>
         {openTrade ? (
           <OpenTrade trade={openTrade} lastClose={lastClose} onChanged={onChanged} />
         ) : sig.data ? (
-          <SignalPanel symbol={symbol} signal={sig.data} onTaken={onTaken} />
+          <>
+            <SignalPanel symbol={symbol} signal={sig.data} stale={!!sig.error} onTaken={onTaken} />
+            {sig.error && <ErrorLine error={sig.error} />}
+          </>
         ) : sig.error ? (
           <ErrorLine error={sig.error} />
         ) : (
@@ -240,6 +258,7 @@ export function Rail({ symbol, openTrade, lastClose, onTaken, onChanged }: Props
           <>
             <Kv k="Range hit rate" v={fmtPct(mc.range_hit)} />
             <Kv k="Regime accuracy" v={fmtPct(mc.regime_accuracy)} />
+            {fc.error && <ErrorLine error={fc.error} />}
           </>
         ) : fc.error ? (
           <ErrorLine error={fc.error} />

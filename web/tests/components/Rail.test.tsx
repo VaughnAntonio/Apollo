@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { expect, it, vi } from 'vitest'
 import type { CheckRow, Entry, Signal } from '../../src/api/types'
 import { Rail } from '../../src/components/Rail'
-import { ApiFailure, mockApi } from '../helpers'
+import { ApiFailure, mockApi, setVisibility } from '../helpers'
 
 const row = (step: string, status: CheckRow['status'], detail: string): CheckRow => ({ step, status, detail })
 const signal = (over: Partial<Signal> = {}): Signal => ({
@@ -88,4 +88,44 @@ it('confirming an auto-close keeps its reason', async () => {
   await vi.waitFor(() => expect(f.mock.calls.some(([u]) => String(u).includes('/close'))).toBe(true))
   const close = f.mock.calls.find(([u]) => String(u).includes('/close'))!
   expect(JSON.parse(String(close[1]!.body))).toEqual({ exit: 99.75, at: '2026-11-03T16:30:00Z', reason: 'stop_auto' })
+})
+
+it('a blank fill keeps the signal price, and text in Fill or Contracts is refused before any request', async () => {
+  const f = mockApi({ '/signal': trigger, '/forecast': forecast, 'POST /journal/take': { id: 7 } })
+  render(<Rail symbol="MNQ" openTrade={null} lastClose={null} onTaken={noop} onChanged={noop} />)
+  fireEvent.click(await screen.findByRole('button', { name: 'Take trade' }))
+  fireEvent.change(screen.getByLabelText('Fill'), { target: { value: 'abc' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Save trade' }))
+  expect(await screen.findByText('Fill must be a number')).toBeTruthy()
+  fireEvent.change(screen.getByLabelText('Fill'), { target: { value: '' } })
+  fireEvent.change(screen.getByLabelText('Contracts'), { target: { value: '0' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Save trade' }))
+  expect(await screen.findByText('Contracts must be a whole number above 0')).toBeTruthy()
+  expect(f.mock.calls.some(([u]) => String(u).includes('/journal/take'))).toBe(false)
+  fireEvent.change(screen.getByLabelText('Contracts'), { target: { value: '' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Save trade' }))
+  await vi.waitFor(() => expect(f.mock.calls.some(([u]) => String(u).includes('/journal/take'))).toBe(true))
+  const take = f.mock.calls.find(([u]) => String(u).includes('/journal/take'))!
+  expect(JSON.parse(String(take[1]!.body))).toEqual({}) // the API uses the signal's own fill and size
+})
+
+it('a blank exit is refused instead of closing at 0', async () => {
+  const f = mockApi({ '/signal': trigger, '/forecast': forecast })
+  render(<Rail symbol="MNQ" openTrade={open} lastClose={null} onTaken={noop} onChanged={noop} />)
+  fireEvent.click(await screen.findByRole('button', { name: 'Close trade' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Save exit' }))
+  expect(await screen.findByText('Exit must be a number')).toBeTruthy()
+  expect(f.mock.calls.some(([u]) => String(u).includes('/close'))).toBe(false)
+})
+
+it('says the API is down under a stale signal instead of hiding it', async () => {
+  mockApi({ '/signal': trigger, '/forecast': forecast })
+  render(<Rail symbol="MNQ" openTrade={null} lastClose={null} onTaken={noop} onChanged={noop} />)
+  expect(await screen.findByRole('button', { name: 'Take trade' })).toBeTruthy()
+  vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')))
+  setVisibility('hidden')
+  setVisibility('visible') // the next poll fails
+  expect((await screen.findAllByText('Start the API: python -m apollo.api.main')).length).toBeGreaterThan(0)
+  expect(screen.getByText('Bull C2')).toBeTruthy() // the last data stays, marked as stale
+  expect(screen.queryByRole('button', { name: 'Take trade' })).toBeNull() // no taking a trade off stale data
 })
