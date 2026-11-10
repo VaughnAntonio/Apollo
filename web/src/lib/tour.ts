@@ -5,7 +5,7 @@ export const TOUR_STEPS: TourStep[] = [
   {
     target: 'ticker',
     title: 'Pick a market',
-    body: 'Choose any of the 14 futures and stocks Apollo collects. The chart, the checklist and the signal all follow this choice.',
+    body: 'Choose any of the 14 futures and stocks Apollo collects. The chart follows your selection. The checklist and signal are available on markets with model support.',
   },
   {
     target: 'timeframes',
@@ -30,7 +30,7 @@ export const TOUR_STEPS: TourStep[] = [
   {
     target: 'signal',
     title: 'Signal and size',
-    body: "When every step passes, the signal shows the entry, stop and target, and sizes the trade to risk 1 to 2% of the account's drawdown limit.",
+    body: "When every step passes, the signal shows the entry, stop and target, and sizes the trade using the configured percentage of account value. The signal also shows how much of the drawdown limit that risk uses.",
   },
   {
     target: 'take-trade',

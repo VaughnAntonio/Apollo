@@ -12,7 +12,7 @@ from collections import defaultdict
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, cast
 from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
@@ -22,7 +22,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from apollo.config import load_symbols
-from apollo.data.serve import TIMEFRAMES, bars_json, read_tf
+from apollo.data.serve import TIMEFRAMES, Timeframe, bars_json, read_tf
 from apollo.data.store import read_bars
 from apollo.journal.stats import calendar, journal_stats
 from apollo.journal.store import JournalStore, NoSuchEntry
@@ -183,7 +183,8 @@ def create_app(
         known(symbol)
         if tf not in TIMEFRAMES:
             raise HTTPException(422, f"tf must be one of {TIMEFRAMES}")
-        return bars_json(read_tf(root, symbol, tf, start, end))
+        interval = cast(Timeframe, tf)
+        return bars_json(read_tf(root, symbol, tf, start, end), interval, symbols[symbol].kind)
 
     @app.get("/forecast")
     def forecast(symbol: str) -> dict:

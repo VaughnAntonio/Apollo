@@ -14,10 +14,11 @@ import { api } from '../api/client'
 import type { Bar, Entry } from '../api/types'
 import { usePoll } from '../api/usePoll'
 import { candleColours, dayDots, mergeBars, palette, snapTo, token, tradeLines, tradeMarkers, type Tf } from '../lib/chart'
-import { crosshairLabel, tickLabel } from '../lib/time'
+import { DrawingsPrimitive } from '../lib/drawPrimitive'
+import { crosshairLabel, nyDate, nyTime, tickLabel } from '../lib/time'
 import { DrawToolbar } from './DrawToolbar'
 import { Empty, ErrorLine, Skeleton } from './State'
-import { useDrawings } from './useDrawings'
+import { useDrawings, type DrawingChart } from './useDrawings'
 
 const sec = (t: Time) => t as number
 
@@ -54,7 +55,7 @@ export function Chart({ symbol, tf, entries = [], openTrade = null, trades = tru
   tfRef.current = tf
   clickRef.current = onMarkerClick
   const box = useRef<HTMLDivElement>(null)
-  const chartRef = useRef<{ chart: IChartApi; series: ISeriesApi<'Candlestick'> } | null>(null)
+  const chartRef = useRef<DrawingChart | null>(null)
   const bars = useRef<{ key: string; list: Bar[] }>({ key: '', list: [] })
   // what the series holds; only the draw effect writes it
   const drawnTo = useRef<{ key: string; time: number }>({ key: '', time: 0 })
@@ -85,8 +86,11 @@ export function Chart({ symbol, tf, entries = [], openTrade = null, trades = tru
       },
     })
     const series = chart.addSeries(CandlestickSeries, {})
-    chartRef.current = { chart, series }
-    drawn.current.markers = createSeriesMarkers(series, [])
+    const primitive = new DrawingsPrimitive()
+    series.attachPrimitive(primitive)
+    chartRef.current = { chart, series, primitive }
+    const markers = createSeriesMarkers(series, [])
+    drawn.current.markers = markers
     // a click on a bar that carries a trade marker opens that trade
     chart.subscribeClick((param) => {
       if (drawBusy.current) return // the press placed, picked or moved a drawing
@@ -102,8 +106,10 @@ export function Chart({ symbol, tf, entries = [], openTrade = null, trades = tru
     return () => {
       watch.disconnect()
       media?.removeEventListener('change', recolour)
-      chart.remove()
       chartRef.current = null
+      markers.detach()
+      series.detachPrimitive(primitive)
+      chart.remove()
     }
   }, [])
 
@@ -152,41 +158,52 @@ export function Chart({ symbol, tf, entries = [], openTrade = null, trades = tru
     drawn.current.markers?.setMarkers(markers.sort((a, b) => a.time - b.time))
   }, [poll.data, entries, openTrade, trades, symbol, tf, themeTick])
 
-  const lastClose = poll.data?.at(-1)?.close ?? null
+  const last = poll.data?.at(-1)
+  const lastClose = last?.close ?? null
   useEffect(() => onLastClose?.(lastClose), [lastClose, onLastClose])
 
   const empty = poll.data !== undefined && poll.data.length === 0
   return (
-    <div className="relative min-h-[440px] min-w-0">
-      <div ref={box} className="absolute inset-0" />
-      {!!poll.data?.length && (
-        <DrawToolbar
-          tool={draw.tool}
-          onTool={draw.setTool}
-          selected={draw.selected}
-          count={draw.count}
-          onDelete={draw.remove}
-          onClear={draw.clear}
-        />
-      )}
-      {poll.error && !!poll.data?.length && (
-        <div className="absolute top-2 left-3 z-10 bg-bg/90 px-2 py-1">
-          <ErrorLine error={poll.error} />
-        </div>
-      )}
-      {(poll.loading && !poll.data) || empty || (poll.error && !poll.data?.length) ? (
-        <div className="absolute inset-0 z-10 grid place-items-center bg-bg p-6">
-          {poll.error && !poll.data?.length ? (
+    <div className="grid min-h-[440px] min-w-0 grid-rows-[auto_1fr]">
+      <div className="flex flex-wrap justify-between gap-x-3 border-b px-3 py-1 font-mono text-[11px] text-muted" aria-label="Candle history">
+        {last && poll.data?.length ? (
+          <>
+            <span>{`Latest bar open ${nyDate(last.time)} ${nyTime(last.time)} ET`}</span>
+            <span>{`${poll.data.length.toLocaleString()} bars · Since ${nyDate(poll.data[0].time)}`}</span>
+          </>
+        ) : <span>{`${symbol} · ${tf}`}</span>}
+      </div>
+      <div className="relative min-h-0">
+        <div ref={box} className="absolute inset-0" />
+        {!!poll.data?.length && (
+          <DrawToolbar
+            tool={draw.tool}
+            onTool={draw.setTool}
+            selected={draw.selected}
+            count={draw.count}
+            onDelete={draw.remove}
+            onClear={draw.clear}
+          />
+        )}
+        {poll.error && !!poll.data?.length && (
+          <div className="absolute top-2 left-3 z-10 bg-bg/90 px-2 py-1">
             <ErrorLine error={poll.error} />
-          ) : empty ? (
-            <Empty>{`No ${tf} bars for ${symbol} yet`}</Empty>
-          ) : (
-            <div className="w-48">
-              <Skeleton rows={3} />
-            </div>
-          )}
-        </div>
-      ) : null}
+          </div>
+        )}
+        {(poll.loading && !poll.data) || empty || (poll.error && !poll.data?.length) ? (
+          <div className="absolute inset-0 z-10 grid place-items-center bg-bg p-6">
+            {poll.error && !poll.data?.length ? (
+              <ErrorLine error={poll.error} />
+            ) : empty ? (
+              <Empty>{`No ${tf} bars for ${symbol} yet`}</Empty>
+            ) : (
+              <div className="w-48">
+                <Skeleton rows={3} />
+              </div>
+            )}
+          </div>
+        ) : null}
+      </div>
     </div>
   )
 }

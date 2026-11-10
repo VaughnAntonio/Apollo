@@ -28,6 +28,8 @@ A GitHub Action collects bars for 14 symbols every weekday evening and commits t
 
 The chart has TradingView-style drawing tools: trend lines, rays, horizontal and vertical lines, rectangles and Fibonacci retracements. Drawings are saved per symbol in your browser, on the public site too, and stay in place when you change timeframe.
 
+The chart shows when the selected series last had a bar and how much history is loaded. In Guide, start a replay for the selected ticker to work through the daily-to-5m checklist. Replay shows candles as they close. Use the 1m chart for visual review.
+
 ## Run it
 
 You need Python 3.13 and Node 26. From the repository root:

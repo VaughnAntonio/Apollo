@@ -91,7 +91,16 @@ def test_bars_are_capped_and_json_is_strict(tmp_path, store_with_bars, bars):
     append_bars(store_with_bars, bars("2026-11-04 09:00", 400, "5m"), "5m")
     run(store_with_bars, tmp_path)
     got = json.loads((tmp_path / "out/bars/MNQ_5m.json").read_text())
-    assert len(got) == 300 and set(got[0]) == {"time", "open", "high", "low", "close", "volume"}
+    assert len(got) == 300 and set(got[0]) == {
+        "time",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "close_time",
+    }
+    assert all(b["close_time"] - b["time"] == 300 for b in got)
     assert not (tmp_path / "out/bars/NVDA_5m.json").exists()  # no bars, no file
     for p in (tmp_path / "out").rglob("*.json"):  # browsers reject NaN
         json.loads(p.read_text(), parse_constant=lambda c, p=p: pytest.fail(f"{p.name} has {c}"))

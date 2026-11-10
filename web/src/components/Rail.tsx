@@ -3,7 +3,7 @@ import { api, ApiError } from '../api/client'
 import type { CheckRow, Entry, Signal } from '../api/types'
 import { usePoll } from '../api/usePoll'
 import { isStatic } from '../lib/mode'
-import { fmtPct, fmtPrice, fmtR, message, openR, parseNum, parseSize } from '../lib/trade'
+import { fmtPct, fmtPrice, fmtR, fmtUsd, message, openR, parseNum, parseSize } from '../lib/trade'
 import { Empty, ErrorLine, Skeleton } from './State'
 
 const STEPS: Record<string, string> = {
@@ -211,7 +211,9 @@ function SignalPanel({ symbol, signal, stale, onTaken }: SignalProps) {
       <Kv k="Entry" v={fmtPrice(signal.entry)} />
       <Kv k="Stop" v={fmtPrice(signal.stop)} />
       <Kv k="Target" v={fmtPrice(signal.target)} />
-      <Kv k="Risk of limit" v={fmtPct(signal.risk_of_limit)} />
+      <Kv k="Planned stop risk" v={fmtUsd(signal.risk_usd ?? null)} />
+      <Kv k="Account value" v={fmtPct(signal.risk_of_account ?? null)} />
+      <Kv k="Drawdown limit" v={fmtPct(signal.risk_of_limit)} />
       <div className="mt-1 h-[3px] bg-soft">
         <i className="block h-full bg-ink" style={{ width: `${Math.min(100, (signal.risk_of_limit ?? 0) * 100)}%` }} />
       </div>

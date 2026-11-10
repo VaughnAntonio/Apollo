@@ -85,6 +85,15 @@ jobs:
           VITE_MODE=static VITE_BASE=/Apollo/ npm --prefix web run build
           cp web/dist/index.html web/dist/404.html
 
+      - name: Verify the public build in Chromium
+        working-directory: web
+        env:
+          APOLLO_PUBLISH_TEST: "1"
+          VITE_BASE: /Apollo/
+        run: |
+          npx playwright install --with-deps chromium
+          npm run e2e
+
       - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v3

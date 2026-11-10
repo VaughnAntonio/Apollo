@@ -88,7 +88,7 @@ export default function App() {
               openTrade={openTrade}
               trades={trades}
               onLastClose={setLastClose}
-            onMarkerClick={(id) => setSheet({ open: true, mode: 'view', id })}
+              onMarkerClick={(id) => setSheet({ open: true, mode: 'view', id })}
             />
           </ErrorBoundary>
           <Rail
@@ -106,7 +106,7 @@ export default function App() {
           ) : page === 'models' ? (
             <Models symbol={symbol} />
           ) : page === 'guide' ? (
-            <Guide onTour={() => (go('chart'), setOffer(false), setTour(true))} />
+            <Guide symbol={symbol} onTour={() => (go('chart'), setOffer(false), setTour(true))} />
           ) : (
             <CaseStudy />
           )}

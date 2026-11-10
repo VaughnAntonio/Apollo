@@ -3,7 +3,7 @@ import { ApiError } from './error'
 import type { BacktestRecord, Bar, Entry, Explain, Forecast, JournalStats, Layer, ModelsReport, Signal, Sym } from './types'
 
 export const MISSING = 'Build file missing'
-const READ_ONLY = 'This is a read-only snapshot'
+const READ_ONLY = 'This build is read-only'
 
 /** Snapshot files sit under the site's base path, e.g. /Apollo/snapshot/... on GitHub Pages. */
 export const snapshotUrl = (path: string) => `${import.meta.env.BASE_URL}snapshot/${path}`

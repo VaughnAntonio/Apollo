@@ -3,7 +3,7 @@
 export type Sym = { code: string; name: string; kind: 'future' | 'stock'; model_enabled: boolean }
 
 /** `time` is the bar's open time in UTC seconds. */
-export type Bar = { time: number; open: number; high: number; low: number; close: number; volume: number }
+export type Bar = { time: number; close_time?: number; open: number; high: number; low: number; close: number; volume: number }
 
 export type CheckRow = { step: string; status: 'pass' | 'wait' | 'fail' | 'no_data'; detail: string }
 
@@ -16,6 +16,8 @@ export type Signal = {
   stop: number | null
   target: number | null
   contracts: number | null
+  risk_usd?: number | null
+  risk_of_account?: number | null
   risk_of_limit: number | null
   account: string
   variant: string

@@ -13,13 +13,13 @@ import {
   newId,
   saveDrawings,
 } from '../lib/draw'
-import { DrawingsPrimitive, type DrawColours } from '../lib/drawPrimitive'
+import type { DrawingsPrimitive, DrawColours } from '../lib/drawPrimitive'
 
-type ChartRef = RefObject<{ chart: IChartApi; series: ISeriesApi<'Candlestick'> } | null>
+export type DrawingChart = { chart: IChartApi; series: ISeriesApi<'Candlestick'>; primitive: DrawingsPrimitive }
 type Drag =
   | { mode: 'create'; x: number; y: number }
   | { mode: 'move'; from: Anchor; orig: Drawing }
-  | { mode: 'end'; id: string; end: 'a' | 'b' }
+  | { mode: 'end'; orig: Drawing; end: 'a' | 'b' }
 
 const DRAG_PX = 4 // a press that moves further than this is a drag, not a click
 
@@ -30,7 +30,7 @@ const DRAG_PX = 4 // a press that moves further than this is a drag, not a click
  */
 export function useDrawings(
   box: RefObject<HTMLDivElement | null>,
-  chartRef: ChartRef,
+  chartRef: RefObject<DrawingChart | null>,
   symbol: string,
   times: number[],
   colours: DrawColours,
@@ -40,7 +40,6 @@ export function useDrawings(
   const [drawings, setDrawings] = useState<Drawing[]>(() => loadDrawings(symbol))
   const [selected, setSelected] = useState<string | null>(null)
   const [preview, setPreview] = useState<Drawing | null>(null)
-  const prim = useRef<DrawingsPrimitive | null>(null)
   const live = useRef({ tool, drawings, selected, preview, symbol })
   live.current = { tool, drawings, selected, preview, symbol }
 
@@ -59,24 +58,8 @@ export function useDrawings(
   }, [])
 
   useEffect(() => {
-    const c = chartRef.current
-    if (!c) return
-    const p = new DrawingsPrimitive()
-    c.series.attachPrimitive(p)
-    prim.current = p
-    return () => {
-      prim.current = null
-      try {
-        c.series.detachPrimitive(p)
-      } catch {
-        // the chart was removed first; the primitive went with it
-      }
-    }
-  }, [chartRef])
-
-  useEffect(() => {
-    prim.current?.update({ drawings, selected, preview, times, colours })
-  }, [drawings, selected, preview, times, colours])
+    chartRef.current?.primitive.update({ drawings, selected, preview, times, colours })
+  }, [chartRef, drawings, selected, preview, times, colours])
 
   useEffect(() => {
     const el = box.current
@@ -88,7 +71,7 @@ export function useDrawings(
       return { x: e.clientX - r.left, y: e.clientY - r.top }
     }
     const inPane = (x: number, y: number) => {
-      const size = prim.current?.pane()
+      const size = chartRef.current?.primitive.pane()
       return !!size && x >= 0 && y >= 0 && x <= size.width && y <= size.height
     }
     const hold = (on: boolean) => chartRef.current?.chart.applyOptions({ handleScroll: !on, handleScale: !on })
@@ -100,7 +83,7 @@ export function useDrawings(
     }
 
     const down = (e: PointerEvent) => {
-      const p = prim.current
+      const p = chartRef.current?.primitive
       if (e.button !== 0 || !p) return
       const { x, y } = local(e)
       busy.current = false
@@ -121,7 +104,8 @@ export function useDrawings(
       const px = p.pixels()
       const sel = selected ? px.find((d) => d.id === selected) : undefined
       const end = sel ? handleAt(sel, x, y) : null
-      if (sel && end) drag = { mode: 'end', id: sel.id, end }
+      const selectedDrawing = drawings.find((d) => d.id === selected)
+      if (selectedDrawing && end) drag = { mode: 'end', orig: selectedDrawing, end }
       else {
         const id = hitTest(px, x, y, p.pane()!)
         setSelected(id)
@@ -134,7 +118,7 @@ export function useDrawings(
     }
 
     const move = (e: PointerEvent) => {
-      const p = prim.current
+      const p = chartRef.current?.primitive
       if (!p) return
       const { x, y } = local(e)
       const { tool, preview, drawings, selected } = live.current
@@ -145,8 +129,8 @@ export function useDrawings(
         const next = moveDrawing(orig, at.time - from.time, at.price - from.price)
         setDrawings(drawings.map((d) => (d.id === orig.id ? next : d)))
       } else if (drag?.mode === 'end' && at) {
-        const { id, end } = drag
-        setDrawings(drawings.map((d) => (d.id === id ? moveAnchor(d, end, at) : d)))
+        const { orig, end } = drag
+        setDrawings(drawings.map((d) => (d.id === orig.id ? moveAnchor(d, end, at) : d)))
       }
       // the pointer says what a press would do
       let cursor = ''
@@ -168,19 +152,34 @@ export function useDrawings(
       const { preview, drawings } = live.current
       if (drag.mode === 'create') {
         // a drag places the second end where it was let go; a click waits for a second click
-        const at = prim.current?.toAnchor(x, y)
+        const at = chartRef.current?.primitive.toAnchor(x, y)
         if (preview && at && Math.hypot(x - drag.x, y - drag.y) > DRAG_PX) finish({ ...preview, b: at })
       } else commit(drawings) // a move or a dragged end, saved once at the end
       drag = null
     }
 
+    const cancel = () => {
+      if (!busy.current) return
+      if (drag?.mode === 'move' || drag?.mode === 'end') {
+        const { orig } = drag
+        setDrawings((list) => list.map((d) => (d.id === orig.id ? orig : d)))
+      }
+      drag = null
+      setPreview(null)
+      busy.current = false
+      el.style.cursor = ''
+      hold(false)
+    }
+
     el.addEventListener('pointerdown', down, true)
     window.addEventListener('pointermove', move)
     window.addEventListener('pointerup', up)
+    window.addEventListener('pointercancel', cancel)
     return () => {
       el.removeEventListener('pointerdown', down, true)
       window.removeEventListener('pointermove', move)
       window.removeEventListener('pointerup', up)
+      window.removeEventListener('pointercancel', cancel)
       hold(false)
     }
   }, [box, chartRef, commit])

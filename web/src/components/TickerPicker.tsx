@@ -93,7 +93,10 @@ export function TickerPicker({ value, onChange }: { value: string; onChange: (co
                       className="grid w-full grid-cols-[64px_1fr] gap-2 px-3 py-1.5 text-left hover:bg-soft aria-selected:bg-soft"
                     >
                       <span className="font-mono">{s.code}</span>
-                      <span className="truncate text-muted">{s.name}</span>
+                      <span className="min-w-0 text-muted">
+                        <span className="block truncate">{s.name}</span>
+                        {!s.model_enabled && <span className="block text-[11px]">Chart only</span>}
+                      </span>
                     </button>
                   ))}
                 </div>

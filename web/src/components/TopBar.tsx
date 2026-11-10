@@ -43,7 +43,7 @@ export function TopBar({ tf, onTf, trades, onTrades, left, chart = true }: Props
           {/* off: a muted outline; on: the track fills with brand and the knob slides across */}
           <span
             aria-hidden="true"
-            className={`relative inline-block h-[14px] w-[24px] rounded-full border after:absolute after:top-[2px] after:left-[2px] after:size-[8px] after:rounded-full motion-safe:transition-colors motion-safe:duration-300 motion-safe:after:transition-[translate,background-color] motion-safe:after:duration-500 after:ease-[cubic-bezier(0.7,0,0.3,1)] ${
+            className={`relative inline-block h-[14px] w-[24px] rounded-full border after:absolute after:top-[2px] after:left-[2px] after:size-[8px] after:rounded-full motion-safe:transition-colors motion-safe:duration-300 motion-safe:after:transition-[translate,background-color] motion-safe:after:duration-150 after:ease-[cubic-bezier(0.7,0,0.3,1)] ${
               trades
                 ? 'border-brand bg-brand/20 after:translate-x-[10px] after:bg-brand'
                 : 'border-muted/60 after:bg-muted group-hover/trades:border-ink group-hover/trades:after:bg-ink'

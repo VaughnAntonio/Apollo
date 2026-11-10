@@ -127,6 +127,8 @@ def test_full_trigger_levels(ohlc):
     assert s["status"] == "trigger" and set(steps(s).values()) == {"pass"}
     assert (s["entry"], s["stop"], s["target"]) == (102.0, 99.75, 110.0)
     assert s["contracts"] == 111 and round(s["risk_of_limit"], 4) == round(111 * 2.25 * 2 / 2500, 4)
+    assert s["risk_usd"] == 499.5
+    assert s["risk_of_account"] == 499.5 / 50_000
 
 
 def test_symbol_without_model(ohlc):

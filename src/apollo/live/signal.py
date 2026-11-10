@@ -74,6 +74,8 @@ def current_signal(
         "target": None,
         "contracts": None,
         "risk_of_limit": None,
+        "risk_usd": None,
+        "risk_of_account": None,
         "checklist": [],
     }
     if not sym.model_enabled:
@@ -180,6 +182,7 @@ def current_signal(
         return out | {"status": "waiting"}
     per_contract = trigger["planned_stop_pts"] * sym.point_value
     contracts = floor(cfg.risk_pct * cfg.account.size / per_contract) if per_contract > 0 else 0
+    risk = contracts * per_contract
     return out | {
         "status": "trigger" if contracts > 0 else "waiting",
         "entry": trigger["entry"],
@@ -187,5 +190,7 @@ def current_signal(
         "stop": trigger["stop"],
         "target": trigger["target"],
         "contracts": contracts,
-        "risk_of_limit": contracts * per_contract / cfg.account.drawdown,
+        "risk_usd": risk,
+        "risk_of_account": risk / cfg.account.size,
+        "risk_of_limit": risk / cfg.account.drawdown,
     }

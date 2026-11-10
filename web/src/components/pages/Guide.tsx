@@ -6,6 +6,7 @@ import { fmtPrice } from '../../lib/trade'
 import { Empty, ErrorLine, Skeleton } from '../State'
 import { ExplainChart, type Level, type Mark } from '../viz/ExplainChart'
 import { PdmDiagram } from '../viz/PdmDiagram'
+import { Replay } from './Replay'
 import { Block, PageHead, num, pct } from './parts'
 
 const label = (s: string) => s.replace('_', ' ')
@@ -208,7 +209,8 @@ function Range({ x }: { x: Explain }) {
 }
 
 /** How Apollo works: the tour over the chart screen, and worked examples on one past MNQ day. */
-export function Guide({ onTour }: { onTour: () => void }) {
+export function Guide({ onTour, symbol = 'MNQ' }: { onTour: () => void; symbol?: string }) {
+  const [replay, setReplay] = useState(false)
   const res = usePoll(() => api.explain('MNQ'), [], 3_600_000)
   const x = res.data
   return (
@@ -225,6 +227,13 @@ export function Guide({ onTour }: { onTour: () => void }) {
           Take the tour
         </button>
       </div>
+      <Block label="Historical replay">
+        {replay ? <Replay key={symbol} symbol={symbol} /> : (
+          <button type="button" onClick={() => setReplay(true)} className="rounded-sm border px-3 py-2 hover:border-brand">
+            Start {symbol} replay
+          </button>
+        )}
+      </Block>
       {res.error && !x ? (
         <Block label="Worked example">
           {res.error.status === 404 ? <Empty>The worked example is not available yet</Empty> : <ErrorLine error={res.error} />}

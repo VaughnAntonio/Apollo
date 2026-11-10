@@ -113,7 +113,7 @@ def export_snapshot(
     for code, sym in symbols.items():
         wrote = False
         for tf in TIMEFRAMES:
-            rows = bars_json(read_tf(root, code, tf).tail(BARS_KEPT.get(tf, 300)))
+            rows = bars_json(read_tf(root, code, tf).tail(BARS_KEPT.get(tf, 300)), tf, sym.kind)
             if rows:
                 _write(out, f"bars/{code}_{tf}.json", rows)
                 wrote = True

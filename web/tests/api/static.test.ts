@@ -29,7 +29,7 @@ it('says the snapshot file is missing rather than asking to start the API', asyn
 })
 
 it('refuses writes', async () => {
-  await expect(staticApi.journal.take('MNQ', {})).rejects.toMatchObject({ status: 405, message: 'This is a read-only snapshot' })
+  await expect(staticApi.journal.take('MNQ', {})).rejects.toMatchObject({ status: 405, message: 'This build is read-only' })
   await expect(staticApi.journal.remove(1)).rejects.toMatchObject({ status: 405 })
   await expect(staticApi.journal.autoClose('MNQ')).rejects.toMatchObject({ status: 405 })
 })

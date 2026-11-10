@@ -61,7 +61,16 @@ def test_health_symbols_and_bars(client):
     syms = {s["code"]: s for s in client.get("/symbols").json()}
     assert syms["MNQ"]["model_enabled"] and not syms["NVDA"]["model_enabled"]
     bars = client.get("/bars", params={"symbol": "MNQ", "tf": "1h"}).json()
-    assert len(bars) == 8 and set(bars[0]) == {"time", "open", "high", "low", "close", "volume"}
+    assert len(bars) == 8 and set(bars[0]) == {
+        "time",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "close_time",
+    }
+    assert bars[0]["close_time"] - bars[0]["time"] == 3600
     assert isinstance(bars[0]["time"], int)
     assert client.get("/bars", params={"symbol": "MNQ", "tf": "2h"}).status_code == 422
     assert client.get("/bars", params={"symbol": "NOPE", "tf": "1h"}).status_code == 404

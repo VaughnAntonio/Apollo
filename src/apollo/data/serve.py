@@ -2,14 +2,17 @@
 
 from datetime import datetime
 from pathlib import Path
+from typing import Literal
 
 import polars as pl
 
 from apollo.config import load_symbols
 from apollo.data.resample import to_globex_daily
 from apollo.data.store import read_bars
+from apollo.data.yahoo import bar_close
 
-TIMEFRAMES = ("1m", "5m", "15m", "1h", "4h", "1d")
+Timeframe = Literal["1m", "5m", "15m", "1h", "4h", "1d"]
+TIMEFRAMES: tuple[Timeframe, ...] = ("1m", "5m", "15m", "1h", "4h", "1d")
 
 
 def read_tf(
@@ -31,10 +34,19 @@ def read_tf(
     return stored
 
 
-def bars_json(df: pl.DataFrame) -> list[dict]:
-    return [
-        {"time": int(t.timestamp()), "open": o, "high": h, "low": lo, "close": c, "volume": v}
-        for t, o, h, lo, c, v in df.select(
-            "ts", "open", "high", "low", "close", "volume"
-        ).iter_rows()
-    ]
+def bars_json(
+    df: pl.DataFrame,
+    tf: Timeframe | None = None,
+    kind: Literal["future", "stock"] = "future",
+) -> list[dict]:
+    if tf is not None:
+        df = df.with_columns(close_time=bar_close(tf, kind).dt.epoch("s"))
+    return df.select(
+        pl.col("ts").dt.epoch("s").alias("time"),
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        *(["close_time"] if tf is not None else []),
+    ).to_dicts()

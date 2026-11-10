@@ -28,7 +28,7 @@ vi.mock('lightweight-charts', () => {
     subscribeClick: vi.fn(),
     remove: vi.fn(),
   }
-  return { createChart: vi.fn(() => chart), createSeriesMarkers: vi.fn(() => ({ setMarkers: vi.fn() })), CandlestickSeries: {} }
+  return { createChart: vi.fn(() => chart), createSeriesMarkers: vi.fn(() => ({ setMarkers: vi.fn(), detach: vi.fn() })), CandlestickSeries: {} }
 })
 
 const bar = (t: number) => ({ time: t, open: 1, high: 1, low: 1, close: 1, volume: 1 })
