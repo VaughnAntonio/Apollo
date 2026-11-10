@@ -1,7 +1,8 @@
 import { useMemo, useState, type PointerEvent } from 'react'
 
 export type Series = { name: string; color: string; dashed?: boolean; points: { x: string; y: number }[] }
-type Props = { series: Series[]; label: string; yFormat: (v: number) => string; height?: number }
+type Ref = { y: number; label: string }
+type Props = { series: Series[]; label: string; yFormat: (v: number) => string; height?: number; refs?: Ref[]; zero?: boolean }
 
 const W = 640
 const PAD = { l: 8, r: 104, t: 12, b: 24 }
@@ -17,13 +18,13 @@ function valueAt(points: Series['points'], x: string): number | undefined {
 }
 
 /** A small SVG line chart with direct end labels and a hover readout. x values sort as strings. */
-export function Line({ series, label, yFormat, height = 220 }: Props) {
+export function Line({ series, label, yFormat, height = 220, refs = [], zero = true }: Props) {
   const [hover, setHover] = useState<number | null>(null)
   const H = height
   const xs = useMemo(() => [...new Set(series.flatMap((s) => s.points.map((p) => p.x)))].sort(), [series])
-  const ys = series.flatMap((s) => s.points.map((p) => p.y))
-  const lo = Math.min(0, ...ys)
-  const hi = Math.max(0, ...ys)
+  const ys = [...series.flatMap((s) => s.points.map((p) => p.y)), ...refs.map((f) => f.y), ...(zero ? [0] : [])]
+  const lo = Math.min(...ys)
+  const hi = Math.max(...ys)
   const plotW = W - PAD.l - PAD.r
   const index = new Map(xs.map((x, i) => [x, i]))
   const px = (i: number) => PAD.l + (xs.length > 1 ? (i / (xs.length - 1)) * plotW : plotW / 2)
@@ -49,7 +50,7 @@ export function Line({ series, label, yFormat, height = 220 }: Props) {
   const at = hover === null ? null : xs[hover]
 
   return (
-    <figure className="relative">
+    <figure className="relative max-w-4xl">
       <svg
         role="img"
         aria-label={summary}
@@ -58,7 +59,15 @@ export function Line({ series, label, yFormat, height = 220 }: Props) {
         onPointerMove={move}
         onPointerLeave={() => setHover(null)}
       >
-        <line x1={PAD.l} x2={W - PAD.r} y1={py(0)} y2={py(0)} stroke="var(--line)" />
+        {zero && <line x1={PAD.l} x2={W - PAD.r} y1={py(0)} y2={py(0)} stroke="var(--line)" />}
+        {refs.map((f) => (
+          <g key={f.label}>
+            <line x1={PAD.l} x2={W - PAD.r} y1={py(f.y)} y2={py(f.y)} stroke="var(--muted)" strokeDasharray="2 3" />
+            <text x={W - PAD.r + 6} y={py(f.y) + 3} className="fill-muted text-[11px]">
+              {f.label}
+            </text>
+          </g>
+        ))}
         <text x={PAD.l} y={PAD.t - 2} className="fill-muted font-mono text-[10px]">
           {yFormat(hi)}
         </text>

@@ -69,6 +69,39 @@
       ],
       "port": 5174,
       "url": "http://localhost:5174"
+    },
+    {
+      "name": "api-review",
+      "runtimeExecutable": ".venv/bin/python",
+      "runtimeArgs": [
+        "-m",
+        "apollo.api.main",
+        "--port",
+        "8001",
+        "--web-port",
+        "5176",
+        "--root",
+        ".superpowers/sandbox"
+      ],
+      "port": 8001,
+      "url": "http://127.0.0.1:8001"
+    },
+    {
+      "name": "web-review",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "VITE_API=http://127.0.0.1:8001",
+        "npm",
+        "--prefix",
+        "web",
+        "run",
+        "dev",
+        "--",
+        "--port",
+        "5176"
+      ],
+      "port": 5176,
+      "url": "http://localhost:5176"
     }
   ]
 }

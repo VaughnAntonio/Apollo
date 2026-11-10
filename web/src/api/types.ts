@@ -140,3 +140,24 @@ export type BacktestRecord = {
   monthly?: { month: string; n: number; r: number; 'net_$': number }[]
   attempt?: number
 }
+
+export type RegimeScore = { n: number; accuracy: number; log_loss: number; confusion: number[][] }
+export type Ledger = { since: string | null; n: number; scored: number; hit_both: number | null }
+
+/** One feature set's run of apollo.models.report. */
+export type ModelsRun = {
+  code: string
+  generated: string
+  feature_set: 'health' | 'context' | 'both'
+  sessions_total: number
+  sessions_used: number
+  dropped: Record<string, number>
+  regime: Record<string, RegimeScore>
+  chosen: string
+  range: { n: number; both: number; up: number; down: number; mean_width: number; by_regime?: Record<string, number> }
+  sessions: { date: string; label: string; hit_both: boolean | null }[]
+  importance?: { feature: string; drop: number }[]
+}
+
+/** GET /models: the --ablation report (one run per feature set) plus the forward ledger. */
+export type ModelsReport = { health?: ModelsRun; context?: ModelsRun; both?: ModelsRun; ledger: Ledger }

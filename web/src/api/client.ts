@@ -1,7 +1,7 @@
 import { isStatic } from '../lib/mode'
 import { ApiError } from './error'
 import { staticApi } from './static'
-import type { BacktestRecord, Bar, Entry, Forecast, JournalIn, JournalPatch, JournalStats, Layer, Signal, Sym } from './types'
+import type { BacktestRecord, Bar, Entry, Forecast, JournalIn, JournalPatch, JournalStats, Layer, ModelsReport, Signal, Sym } from './types'
 
 export { ApiError }
 
@@ -45,6 +45,7 @@ export const liveApi = {
   signal: (symbol: string) => call<Signal>('/signal', { symbol }),
   forecast: (symbol: string) => call<Forecast>('/forecast', { symbol }),
   backtest: (symbol: string, layer: Layer) => call<BacktestRecord[]>('/backtest/summary', { symbol, layer }),
+  models: (symbol: string) => call<ModelsReport>('/models', { symbol }),
   journal: {
     list: () => call<Entry[]>('/journal'),
     get: (id: number) => call<Entry>(`/journal/${id}`),
