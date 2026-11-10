@@ -193,3 +193,39 @@ def test_take_twice_refused(client):
 def test_signal_days_feed_skipped(client):
     client.get("/signal", params={"symbol": "MNQ"})  # a trigger nobody took
     assert client.get("/journal/stats").json()["stats"]["skipped"] == ["2026-11-03"]
+
+
+def test_model_check_last_60():
+    from apollo.api.main import model_check
+
+    sessions = [
+        {"label": "chop", "proba": {"chop": 0.6, "normal": 0.4}, "hit_both": i % 4 != 0}
+        for i in range(80)
+    ]
+    sessions[-1]["proba"] = {"chop": 0.1, "normal": 0.9}
+    mc = model_check(sessions)
+    assert mc["n"] == 60
+    assert mc["range_hit"] == pytest.approx(45 / 60)
+    assert mc["regime_accuracy"] == pytest.approx(59 / 60)
+    assert model_check([]) == {"n": 0, "range_hit": None, "regime_accuracy": None}
+
+
+def test_auto_close_endpoint(client):
+    assert client.post("/journal/auto-close", params={"symbol": "MNQ"}).json() == {"closed": []}
+    body = MANUAL | {"opened_at": "2026-11-03T09:00:00", "target": 200.0, "stop": 0.5}
+    i = client.post("/journal", json=body).json()["id"]
+    r = client.post("/journal/auto-close", params={"symbol": "MNQ"})
+    assert r.status_code == 200 and r.json() == {"closed": [i]}  # the 15:00 bar flats it
+    e = client.get(f"/journal/{i}").json()
+    assert e["needs_confirm"] is True and e["exit"] == 106.0
+
+
+def test_media_serves_only_uploaded_names(client):
+    i = client.post("/journal", json=MANUAL).json()["id"]
+    up = client.post(
+        f"/journal/{i}/screenshot", files={"file": ("a.png", b"\x89PNG", "image/png")}
+    ).json()
+    got = client.get("/media/" + up["screenshot"].removeprefix("journal_media/"))
+    assert got.status_code == 200 and got.headers["content-type"] == "image/png"
+    for bad in ["../j.duckdb", "x.png", "1-abc.png", "..%2Fj.duckdb"]:
+        assert client.get(f"/media/{bad}").status_code == 404

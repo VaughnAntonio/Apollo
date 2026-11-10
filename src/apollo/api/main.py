@@ -5,6 +5,7 @@ Run: python -m apollo.api.main [--port 8000]
 
 import argparse
 import json
+import re
 import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -15,20 +16,21 @@ from zoneinfo import ZoneInfo
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from apollo.config import load_symbols
 from apollo.data.store import read_bars
 from apollo.journal.stats import calendar, journal_stats
 from apollo.journal.store import JournalStore
-from apollo.journal.trades import close_trade, take_trade
+from apollo.journal.trades import auto_close, close_trade, take_trade
 
 TIMEFRAMES = ("1m", "5m", "15m", "1h", "4h", "1d")
 DEV_ORIGIN = "http://localhost:5173"  # Plan 6's Vite dev server; nothing else may call the API
 MAX_SHOT = 5 * 1024 * 1024
 IMAGE_TYPES = {"image/png": "png", "image/jpeg": "jpg"}
 NY = ZoneInfo("America/New_York")
+MEDIA_NAME = re.compile(r"^\d+-[0-9a-f]{32}\.(png|jpg)$")  # only names the upload route makes
 Price = Annotated[float, Field(allow_inf_nan=False)]
 Fees = Annotated[float, Field(ge=0, allow_inf_nan=False)]
 Size = Annotated[int, Field(gt=0, strict=True)]
@@ -89,6 +91,19 @@ class CloseIn(BaseModel):
     reason: str = "manual"
 
 
+def model_check(sessions: list[dict]) -> dict[str, Any]:
+    """Range hit rate and regime accuracy over the last 60 sessions, for the rail."""
+    last = sessions[-60:]
+    if not last:
+        return {"n": 0, "range_hit": None, "regime_accuracy": None}
+    right = sum(max(s["proba"], key=s["proba"].get) == s["label"] for s in last)
+    return {
+        "n": len(last),
+        "range_hit": sum(bool(s["hit_both"]) for s in last) / len(last),
+        "regime_accuracy": right / len(last),
+    }
+
+
 def _default_signal(root: Path, code: str, now: datetime) -> dict[str, Any]:
     from apollo.live.signal import current_signal
 
@@ -103,6 +118,7 @@ def _default_forecast(root: Path, code: str) -> dict[str, Any]:
         "latest": r["latest"],
         "range": r["range"],
         "regime_model": r["chosen"],
+        "model_check": model_check(r["sessions"]),
         "research_only": True,
     }
 
@@ -226,6 +242,17 @@ def create_app(
         fc = forecast(symbol) if symbols[symbol].model_enabled else None
         return {"id": take_trade(store, sig, fc, fill=body.fill, size=body.size)}
 
+    @app.post("/journal/auto-close")
+    def auto_close_open(symbol: str = "MNQ") -> dict:
+        open_ = [e for e in store.list(symbol=known(symbol)) if e["exit"] is None]
+        if not open_:
+            return {"closed": []}
+        since = min(e["opened_at"] for e in open_).astimezone(UTC)  # the bars are in UTC
+        bars = read_bars(root, symbol, "5m", since)
+        if bars.is_empty():
+            bars = read_bars(root, symbol, "1h", since)
+        return {"closed": auto_close(store, {symbol: bars}, datetime.now(UTC))}
+
     @app.get("/journal")
     def list_journal(
         symbol: str | None = None,
@@ -274,6 +301,13 @@ def create_app(
         name = f"{id}-{uuid.uuid4().hex}.{ext}"  # never the uploaded name
         (media_dir / name).write_bytes(data)
         return store.update(id, {"screenshot": f"journal_media/{name}"})
+
+    @app.get("/media/{name}")
+    def media(name: str) -> FileResponse:
+        path = media_dir / name
+        if not MEDIA_NAME.match(name) or not path.is_file():
+            raise HTTPException(404, "no such file")
+        return FileResponse(path, media_type="image/png" if name.endswith(".png") else "image/jpeg")
 
     @app.get("/backtest/summary")
     def backtest_summary(symbol: str, layer: Literal["D-1H", "1H-5m"] = "D-1H") -> Any:
