@@ -171,3 +171,29 @@ def test_strategy_stats_ignore_the_account_breach(ohlc):
     )
     assert res["expectancy"]["n"] == 2  # the strategy's own record keeps both trades
     assert res["account"]["breached_at"] is not None and res["account"]["trades"] == 1
+
+
+def test_backtest_report_carries_trades_curves_and_months(ohlc):
+    setups, bars, sessions = _frames(ohlc, days=(date(2026, 6, 2), date(2026, 6, 9)))
+    d1 = ohlc(
+        [(100.0 + i, 101.0 + i, 99.0 + i, 100.5 + i) for i in range(200)], "2026-01-04 18:00", "1d"
+    )
+    res = run_backtest(
+        Path("unused"),
+        "MNQ",
+        "D-1H",
+        "plain",
+        CFG,
+        setups=setups,
+        bars=bars,
+        forecasts=pl.DataFrame(),
+        d1=d1,
+        sessions=sessions,
+    )
+    assert {"trades", "curves", "monthly"} <= set(res)
+    assert len(res["trades"]) == res["expectancy"]["n"] == 2
+    assert set(res["trades"][0]) == {"session", "direction", "r", "net_$", "exit_reason"}
+    assert res["curves"]["strategy"][-1]["usd"] == pytest.approx(res["equity"]["net_$"])
+    assert res["curves"]["buy_hold"][-1]["usd"] == pytest.approx(res["benchmarks"]["buy_hold_$"])
+    assert res["monthly"][0]["month"] == "2026-06" and res["monthly"][0]["n"] == 2
+    json.dumps({k: v for k, v in res.items() if not k.startswith("_")}, default=str)

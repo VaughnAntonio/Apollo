@@ -57,3 +57,35 @@ def test_ma_rule_uses_yesterdays_signal(ohlc):
     d1 = ohlc([(c, c, c, c) for c in closes], "2026-01-04 18:00", "1d")
     b = benchmarks(d1, date(2026, 1, 1), date(2026, 12, 31), MNQ)
     assert b["buy_hold_$"] == pytest.approx(110 * 2) and b["ma_20_50_$"] == pytest.approx(10 * 2)
+
+
+def test_benchmark_curves_end_at_the_benchmark_totals(ohlc):
+    from apollo.strategy.metrics import benchmark_curves
+
+    closes = [100.0 + (i % 7) * 3 - i * 0.2 for i in range(120)]
+    d1 = ohlc([(c, c + 1, c - 1, c) for c in closes], "2026-01-04 18:00", "1d")
+    start, end = date(2026, 2, 1), date(2026, 4, 30)
+    c = benchmark_curves(d1, start, end, MNQ)
+    b = benchmarks(d1, start, end, MNQ)
+    assert c["buy_hold"][-1]["usd"] == pytest.approx(b["buy_hold_$"])
+    assert c["ma_20_50"][-1]["usd"] == pytest.approx(b["ma_20_50_$"])
+    days = [p["date"] for p in c["buy_hold"]]
+    assert days == sorted(days) and days[0] >= "2026-02-01" and days[-1] <= "2026-04-30"
+
+
+def test_monthly_table_groups_closed_trades_by_session_month():
+    from apollo.strategy.metrics import monthly_table
+
+    t = pl.DataFrame(
+        {
+            "session": [date(2026, 1, 5), date(2026, 1, 20), date(2026, 2, 2), date(2026, 2, 3)],
+            "r": [1.0, -1.0, 2.0, None],
+            "net_$": [50.0, -40.0, 90.0, None],
+            "skip": [None, None, None, "daily_cap"],
+        },
+        schema_overrides={"skip": pl.Utf8},
+    )
+    assert monthly_table(t) == [
+        {"month": "2026-01", "n": 2, "r": 0.0, "net_$": 10.0},
+        {"month": "2026-02", "n": 1, "r": 2.0, "net_$": 90.0},
+    ]
