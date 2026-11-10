@@ -5,8 +5,8 @@ import { useTheme, type Theme } from '../lib/theme'
 import { EndMark } from './EndMark'
 import { Wordmark } from './Wordmark'
 
-export type Page = 'chart' | 'backtest' | 'models' | 'case-study'
-const PAGES: Page[] = ['chart', 'backtest', 'models', 'case-study']
+export type Page = 'chart' | 'backtest' | 'models' | 'case-study' | 'guide'
+const PAGES: Page[] = ['chart', 'backtest', 'models', 'case-study', 'guide']
 
 const pageFromHash = (): Page => {
   const p = location.hash.replace(/^#\//, '') as Page
@@ -34,6 +34,7 @@ const TILES: Tile[] = [
   { n: '03', label: 'Backtest', page: 'backtest' },
   { n: '04', label: 'Models', page: 'models' },
   { n: '05', label: 'Case study', page: 'case-study' },
+  { n: '06', label: 'Guide', page: 'guide' },
 ]
 const THEMES: { t: Theme; label: string }[] = [
   { t: 'light', label: 'Light' },
@@ -63,6 +64,7 @@ export function Menu({ page, onNavigate, onJournal, onNewEntry }: Props) {
     <Dialog.Root open={open} onOpenChange={setOpen}>
       <Dialog.Trigger
         aria-label="Open menu"
+        data-tour="journal"
         className="group flex size-9 shrink-0 flex-col items-center justify-center gap-[5px] rounded-sm border border-ink/70 hover:border-brand hover:text-brand"
       >
         {/* Mecha hamburger: the outer bars shrink to half on hover. */}
@@ -86,7 +88,7 @@ export function Menu({ page, onNavigate, onJournal, onNewEntry }: Props) {
           </div>
 
           <nav aria-label="Pages" className="mt-auto">
-            <ul className="grid grid-cols-2 gap-2 md:grid-cols-5 [&:has(li:hover)>li]:opacity-15 [&>li]:transition-opacity [&>li]:duration-500 [&>li:hover]:opacity-100">
+            <ul className="grid grid-cols-2 gap-2 md:grid-cols-6 [&:has(li:hover)>li]:opacity-15 [&>li]:transition-opacity [&>li]:duration-500 [&>li:hover]:opacity-100">
               {TILES.map((tile, i) => (
                 <li key={tile.label} className="overflow-hidden border">
                   <a

@@ -13,12 +13,12 @@ const renderMenu = (over: Partial<Parameters<typeof Menu>[0]> = {}) => {
   return props
 }
 
-it('opens from the burger, lists the five tiles in order, and routes', () => {
+it('opens from the burger, lists the six tiles in order, and routes', () => {
   const p = renderMenu()
   fireEvent.click(screen.getByRole('button', { name: 'Open menu' }))
   const dialog = screen.getByRole('dialog', { name: 'Menu' })
   const tiles = within(dialog).getAllByRole('link')
-  expect(tiles.map((t) => t.textContent)).toEqual(['01Chart', '02Journal', '03Backtest', '04Models', '05Case study'])
+  expect(tiles.map((t) => t.textContent)).toEqual(['01Chart', '02Journal', '03Backtest', '04Models', '05Case study', '06Guide'])
   expect(tiles[0].getAttribute('aria-current')).toBe('page')
   fireEvent.click(within(dialog).getByText('Journal'))
   expect(p.onJournal).toHaveBeenCalled()

@@ -18,7 +18,7 @@ export function TopBar({ tf, onTf, trades, onTrades, left, chart = true }: Props
     <header className="flex flex-wrap items-center gap-6 border-b px-5 py-3">
       {left}
       {chart && (
-      <nav aria-label="Timeframe" className="flex gap-0.5">
+      <nav aria-label="Timeframe" data-tour="timeframes" className="flex gap-0.5">
         {TIMEFRAMES.map((t) => (
           <button
             key={t.tf}

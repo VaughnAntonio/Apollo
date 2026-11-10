@@ -6,15 +6,18 @@ import { ErrorBoundary } from './components/ErrorBoundary'
 import { Menu, useHashPage } from './components/Menu'
 import { Backtest } from './components/pages/Backtest'
 import { CaseStudy } from './components/pages/CaseStudy'
+import { Guide } from './components/pages/Guide'
 import { Models } from './components/pages/Models'
 import { Sheet } from './components/journal/Sheet'
 import { Rail } from './components/Rail'
 import { TickerPicker } from './components/TickerPicker'
 import { TopBar } from './components/TopBar'
+import { Tour } from './components/Tour'
 import { Wordmark } from './components/Wordmark'
 import { TIMEFRAMES, type Tf } from './lib/chart'
 import { isStatic } from './lib/mode'
 import { get, set } from './lib/storage'
+import { markTourDone, shouldOfferTour } from './lib/tour'
 
 const storedTf = (): Tf => {
   const t = get('apollo.tf', '5m') as Tf
@@ -28,6 +31,8 @@ export default function App() {
   const [sheet, setSheet] = useState<SheetState>({ open: false, mode: 'view', id: null })
   const [symbol, setSymbol] = useState(() => get('apollo.symbol', 'MNQ'))
   const [tf, setTf] = useState<Tf>(storedTf)
+  const [tour, setTour] = useState(false)
+  const [offer, setOffer] = useState(() => !isStatic() && shouldOfferTour())
   const [trades, setTrades] = useState(() => get('apollo.trades', 'on') !== 'off')
   const [lastClose, setLastClose] = useState<number | null>(null)
   const journal = usePoll(api.journal.list, [])
@@ -67,7 +72,9 @@ export default function App() {
               onNewEntry={() => setSheet({ open: true, mode: 'new', id: null })}
             />
             <Wordmark />
-            <TickerPicker value={symbol} onChange={setSymbol} />
+            <span data-tour="ticker">
+              <TickerPicker value={symbol} onChange={setSymbol} />
+            </span>
           </>
         }
       />
@@ -98,6 +105,8 @@ export default function App() {
             <Backtest symbol={symbol} />
           ) : page === 'models' ? (
             <Models symbol={symbol} />
+          ) : page === 'guide' ? (
+            <Guide onTour={() => (go('chart'), setOffer(false), setTour(true))} />
           ) : (
             <CaseStudy />
           )}
@@ -111,6 +120,28 @@ export default function App() {
         onOpenChange={(open) => setSheet((s) => ({ ...s, open }))}
         onChanged={journal.refresh}
       />
+      <Tour open={tour} onClose={() => setTour(false)} />
+      {offer && !tour && page === 'chart' && (
+        <aside aria-label="Tour" className="fixed right-4 bottom-12 z-40 grid w-64 gap-3 rounded-sm border bg-panel p-4 shadow-lg">
+          <p>New here? Take the 1-minute tour.</p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => (setOffer(false), setTour(true))}
+              className="rounded-sm bg-brand px-3 py-1.5 font-mono text-[10px] font-medium tracking-widest text-brand-fg uppercase"
+            >
+              Start
+            </button>
+            <button
+              type="button"
+              onClick={() => (markTourDone(), setOffer(false))}
+              className="rounded-sm border px-3 py-1.5 font-mono text-[10px] font-medium tracking-widest uppercase"
+            >
+              No thanks
+            </button>
+          </div>
+        </aside>
+      )}
       <footer className="flex flex-wrap justify-between gap-x-4 border-t px-5 py-2.5 font-mono text-[11px] text-muted">
         <span>Research tool. Not financial advice.</span>
         <span>Data: Yahoo Finance</span>
