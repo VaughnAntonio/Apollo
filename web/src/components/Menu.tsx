@@ -88,19 +88,38 @@ export function Menu({ page, onNavigate, onJournal, onNewEntry }: Props) {
           </div>
 
           <nav aria-label="Pages" className="mt-auto">
-            <ul className="grid grid-cols-2 gap-2 md:grid-cols-6 [&:has(li:hover)>li]:opacity-15 motion-safe:[&>li]:transition-opacity motion-safe:[&>li]:duration-500 [&>li:hover]:opacity-100">
+            <ul className="grid grid-cols-2 gap-2 md:grid-cols-6">
               {TILES.map((tile, i) => (
-                <li key={tile.label} className="overflow-hidden border">
+                <li
+                  key={tile.label}
+                  className="group/tile overflow-hidden border hover:border-brand/50 motion-safe:transition-colors motion-safe:duration-500 has-[a[aria-current]]:border-brand/40"
+                >
                   <a
                     href={tile.page ? `#/${tile.page}` : '#journal'}
                     aria-current={tile.page === page ? 'page' : undefined}
                     onClick={choose(tile)}
                     style={stagger(i)}
                     data-menu-item
-                    className="flex items-baseline gap-2 px-4 py-7 text-[15px] leading-snug hover:text-brand aria-[current]:text-brand"
+                    className="relative flex items-baseline gap-2 px-4 py-7 text-[15px] leading-snug hover:text-brand aria-[current]:text-brand motion-safe:transition-colors motion-safe:duration-300"
                   >
-                    <span className="font-mono text-[11px] text-muted">{tile.n}</span>
-                    <span>{tile.label}</span>
+                    {/* hover: a faint brand fill rises from the bottom, the label steps right, an arrow slides in */}
+                    <span
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-0 origin-bottom scale-y-0 bg-brand/[0.08] group-hover/tile:scale-y-100 motion-safe:transition-transform motion-safe:duration-500 ease-[cubic-bezier(0.7,0,0.3,1)]"
+                    />
+                    <span className="relative font-mono text-[11px] text-muted group-hover/tile:text-brand motion-safe:transition-colors motion-safe:duration-300">
+                      {tile.n}
+                    </span>
+                    <span className="relative group-hover/tile:translate-x-1 motion-safe:transition-transform motion-safe:duration-500 ease-[cubic-bezier(0.7,0,0.3,1)]">
+                      {tile.label}
+                    </span>
+                    <svg
+                      aria-hidden="true"
+                      viewBox="0 0 12 12"
+                      className="relative ml-auto size-3 self-center -translate-x-2 opacity-0 group-hover/tile:translate-x-0 group-hover/tile:opacity-100 motion-safe:transition-[translate,opacity] motion-safe:duration-500 ease-[cubic-bezier(0.7,0,0.3,1)]"
+                    >
+                      <path d="M1 6h9M6.5 2.5 10 6l-3.5 3.5" fill="none" stroke="currentColor" strokeWidth="1.2" />
+                    </svg>
                   </a>
                 </li>
               ))}
@@ -118,7 +137,7 @@ export function Menu({ page, onNavigate, onJournal, onNewEntry }: Props) {
                       type="button"
                       aria-pressed={theme === t}
                       onClick={() => setTheme(t)}
-                      className="px-3 py-1.5 font-mono text-[10px] font-medium tracking-wider text-muted uppercase aria-pressed:bg-ink aria-pressed:text-bg"
+                      className="px-3 py-1.5 font-mono text-[10px] font-medium tracking-wider text-muted uppercase hover:text-ink aria-pressed:bg-ink aria-pressed:text-bg motion-safe:transition-colors motion-safe:duration-300"
                     >
                       {label}
                     </button>

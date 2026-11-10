@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { ApiError } from './error'
 import type { BacktestRecord, Bar, Entry, Explain, Forecast, JournalStats, Layer, ModelsReport, Signal, Sym } from './types'
 
-export const MISSING = 'Snapshot file missing'
+export const MISSING = 'Build file missing'
 const READ_ONLY = 'This is a read-only snapshot'
 
 /** Snapshot files sit under the site's base path, e.g. /Apollo/snapshot/... on GitHub Pages. */

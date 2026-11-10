@@ -27,7 +27,7 @@ afterEach(() => vi.unstubAllEnvs())
 
 it('static mode hides every write control and shows the snapshot date', async () => {
   render(<App />)
-  expect(await screen.findByText('Snapshot of 2026-11-10')).toBeTruthy()
+  expect(await screen.findByText('Build 2026-11-10')).toBeTruthy()
   expect(screen.queryByText('Delayed 10m')).toBeNull()
   await screen.findByText('Long')
   expect(screen.queryByText('Take trade')).toBeNull()
