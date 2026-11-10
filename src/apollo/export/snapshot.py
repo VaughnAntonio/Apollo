@@ -20,6 +20,7 @@ from zoneinfo import ZoneInfo
 
 from apollo.config import load_symbols
 from apollo.data.serve import TIMEFRAMES, bars_json, read_tf
+from apollo.explain import EXAMPLE, explain_day
 from apollo.journal.stats import calendar, journal_stats
 from apollo.journal.store import JournalStore
 from apollo.live.signal import current_signal
@@ -144,9 +145,9 @@ def export_snapshot(
             "calendar": calendar(rows),
         },
     )
-    explain = reports_dir / "explain.json"
-    if explain.exists():
-        _write(out, "explain.json", _read(explain))
+    attempt(
+        "explain", EXAMPLE["symbol"], partial(explain_day, root, EXAMPLE["symbol"], EXAMPLE["date"])
+    )
 
     meta = {
         "generated": now.astimezone(UTC).isoformat(timespec="seconds"),

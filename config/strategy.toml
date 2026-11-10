@@ -53,3 +53,8 @@ both = [true, true, false, false, false, false]
 # The variant the live checklist follows. Plan 4 found no filter with enough trades to prefer one,
 # so the plain Fractal Model it is until the evidence says otherwise.
 variant = "plain"
+
+# The worked example on the Guide page: the most recent plain D-1H trade before the holdout.
+[explain]
+symbol = "MNQ"
+date = 2026-04-22

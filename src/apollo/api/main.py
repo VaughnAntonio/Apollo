@@ -295,6 +295,15 @@ def create_app(
             )
         return json.loads(path.read_text())
 
+    @app.get("/explain")
+    def explain(symbol: str) -> Any:
+        from apollo import explain as ex
+
+        if known(symbol) != ex.EXAMPLE["symbol"]:
+            raise HTTPException(404, f"the worked example is on {ex.EXAMPLE['symbol']} only")
+        day = ex.EXAMPLE["date"]
+        return cached("explain", symbol, day.isoformat(), lambda: ex.explain_day(root, symbol, day))
+
     @app.get("/models")
     def models(symbol: str) -> Any:
         from apollo.models.report import ledger_summary

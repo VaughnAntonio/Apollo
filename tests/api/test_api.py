@@ -292,3 +292,17 @@ def test_models_endpoint_adds_the_ledger_summary(client, tmp_path):
     body = client.get("/models", params={"symbol": "MNQ"}).json()
     assert body["both"] == {"chosen": "logit"}
     assert body["ledger"] == {"since": None, "n": 0, "scored": 0, "hit_both": None}
+
+
+def test_explain_only_for_the_worked_example(client, monkeypatch):
+    from apollo import explain
+
+    monkeypatch.setattr(
+        explain, "explain_day", lambda root, code, day: {"date": day.isoformat(), "symbol": code}
+    )
+    assert client.get("/explain", params={"symbol": "MNQ"}).json() == {
+        "date": "2026-04-22",
+        "symbol": "MNQ",
+    }
+    r = client.get("/explain", params={"symbol": "MES"})
+    assert r.status_code == 404 and "MNQ" in r.json()["detail"]

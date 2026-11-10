@@ -161,3 +161,38 @@ export type ModelsRun = {
 
 /** GET /models: the --ablation report (one run per feature set) plus the forward ledger. */
 export type ModelsReport = { health?: ModelsRun; context?: ModelsRun; both?: ModelsRun; ledger: Ledger }
+
+export type Setup = {
+  direction: 'bull' | 'bear'
+  c1_ts: number
+  c2_ts: number
+  c2_close: number
+  c1_high: number
+  c1_low: number
+  poi_level: number | null
+  poi_kind: string | null
+  cisd_ts: number
+  cisd_level: number
+  protected: number
+  entry_ts: number | null
+  entry: number
+  stop: number
+  target: number
+}
+
+/** GET /explain: one past day, worked through for the Guide page. Times are UTC seconds. */
+export type Explain = {
+  date: string
+  symbol: string
+  fractal: { htf: Bar[]; ltf: Bar[]; setup: Setup }
+  regime: { features: Record<string, number | null>; proba: Record<string, number>; model: string; label: string }
+  range: {
+    open: number
+    up_bound: number
+    down_bound: number
+    high: number
+    low: number
+    hit_both: boolean | null
+    coverage_60: { date: string; hit_both: boolean }[]
+  }
+}

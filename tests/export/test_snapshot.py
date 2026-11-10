@@ -38,6 +38,7 @@ def store_with_bars(tmp_path, bars, monkeypatch):
     monkeypatch.setattr(
         snapshot, "current_signal", lambda root, code, now: {"status": "no_setup", "as_of": now}
     )
+    monkeypatch.setattr(snapshot, "explain_day", lambda root, code, day: {"date": "x"})
     return root
 
 
@@ -108,3 +109,9 @@ def test_reports_are_copied_when_present(tmp_path, store_with_bars):
     ]
     assert json.loads((tmp_path / "out/models/MNQ.json").read_text())["ledger"]["n"] == 0
     assert not list((tmp_path / "out/backtest").glob("*final*"))
+
+
+def test_the_worked_example_is_exported(tmp_path, store_with_bars, monkeypatch):
+    monkeypatch.setattr(snapshot, "explain_day", lambda root, code, day: {"date": day.isoformat()})
+    run(store_with_bars, tmp_path)
+    assert json.loads((tmp_path / "out/explain/MNQ.json").read_text()) == {"date": "2026-04-22"}
