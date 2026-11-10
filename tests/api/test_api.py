@@ -384,3 +384,25 @@ def test_models_endpoint_reads_a_single_run_report_too(client, tmp_path):
     )
     body = client.get("/models", params={"symbol": "MNQ"}).json()
     assert body["both"]["chosen"] == "logit" and "code" not in body
+
+
+def test_a_bug_in_the_model_code_is_a_500_not_a_404(tmp_path):
+    def broken(root, code, now):
+        raise KeyError("as_of")
+
+    app = create_app(tmp_path / "data", journal_path=tmp_path / "j.duckdb", signal_fn=broken)
+    c = TestClient(app, base_url="http://localhost", raise_server_exceptions=False)
+    assert c.get("/signal", params={"symbol": "MNQ"}).status_code == 500
+    assert c.patch("/journal/9999", json={"notes": "x"}).status_code == 404  # still a clean 404
+    assert c.post("/journal/9999/close", json={"exit": 1.0}).status_code == 404
+
+
+def test_old_screenshots_are_removed(client, tmp_path):
+    media = tmp_path / "journal_media"
+    i = client.post("/journal", json=MANUAL).json()["id"]
+    png = ("x.png", b"\x89PNG\r\n\x1a\n", "image/png")
+    client.post(f"/journal/{i}/screenshot", files={"file": png})
+    second = client.post(f"/journal/{i}/screenshot", files={"file": png}).json()["screenshot"]
+    assert [p.name for p in media.iterdir()] == [second.removeprefix("journal_media/")]
+    assert client.delete(f"/journal/{i}").status_code == 200
+    assert list(media.iterdir()) == []

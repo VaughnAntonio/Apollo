@@ -113,3 +113,25 @@ def test_naive_times_are_new_york(tmp_path):
     e = s.get(i)
     assert e is not None and e["opened_at"] == datetime(2026, 11, 10, 10, tzinfo=NY)
     assert s.list(start=datetime(2026, 11, 10, 9, 59), end=datetime(2026, 11, 10, 10, 1))
+
+
+def test_a_row_survives_its_symbol_leaving_the_config(tmp_path, monkeypatch):
+    from apollo.journal import store
+
+    s = JournalStore(tmp_path / "j.duckdb")
+    s.add(BULL | {"exit": 106.0, "closed_at": CLOSE})
+    monkeypatch.setattr(store, "load_symbols", dict)
+    (e,) = s.list()
+    assert e["symbol"] == "MNQ" and e["exit"] == 106.0
+    assert e["risk_$"] is None and e["pnl_$"] is None and e["r"] is None  # no point value now
+
+
+def test_listing_reads_the_symbol_config_once(tmp_path, monkeypatch):
+    from apollo.journal import store
+
+    s = JournalStore(tmp_path / "j.duckdb")
+    for _ in range(3):
+        s.add(BULL)
+    real, calls = store.load_symbols, []
+    monkeypatch.setattr(store, "load_symbols", lambda: calls.append(1) or real())
+    assert len(s.list()) == 3 and len(calls) == 1

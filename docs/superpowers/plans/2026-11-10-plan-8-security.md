@@ -18,4 +18,4 @@
 - [x] **3. Skip what needs a model.** L3 and the local pentest run only if `ollama` is installed. Record the skip.
 - [x] **4. Triage.** Read the code behind every finding. Mark each one real, false positive or accepted risk in the review file.
 - [x] **5. Fix.** Each real finding gets a failing test, then the fix. Run the full suite.
-- [x] **6. Whole-repo review.** `/code-review` after the scan (spec 5.16). Findings are listed in the review file, not yet fixed.
+- [x] **6. Whole-repo review.** `/code-review` after the scan (spec 5.16). Findings are listed in the review file and fixed.

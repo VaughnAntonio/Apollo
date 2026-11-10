@@ -4,7 +4,8 @@ Take trade freezes what the model said at that moment into the entry's snapshot.
 the backtest's own bar rules, then waits for Vaughn to confirm the fill.
 """
 
-from datetime import UTC, datetime
+import threading
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import numpy as np
@@ -16,6 +17,7 @@ from apollo.journal.store import SIDES, JournalStore
 from apollo.strategy.config import load_trade_config
 from apollo.strategy.walk import NY, walk_trade
 
+_TAKE = threading.Lock()  # one take at a time, so a double click can't open two trades
 AUTO_REASONS = {
     "stop": "stop_auto",
     "target": "target_auto",
@@ -53,6 +55,17 @@ def take_trade(
     """Journal the current signal as a trade (source "signal")."""
     if signal.get("status") != "trigger":
         raise ValueError("there is no trade signal right now")
+    with _TAKE:
+        return _take(store, signal, forecast, fill, size)
+
+
+def _take(
+    store: JournalStore,
+    signal: dict[str, Any],
+    forecast: dict[str, Any] | None,
+    fill: float | None,
+    size: int | None,
+) -> int:
     if any(
         e["exit"] is None and e["source"] != "imported" for e in store.list(symbol=signal["symbol"])
     ):
@@ -116,6 +129,13 @@ def auto_close(
         if k >= len(stamps):
             continue
         risk_pts = abs(e["entry"] - e["initial_stop"])
+        local = opened.astimezone(NY)
+        # opened after today's flat time (the evening session): flat at tomorrow's instead
+        late = (
+            datetime.combine(local.date() + timedelta(days=1), flat_at, NY)
+            if local.time() >= flat_at
+            else None
+        )
         px, at, reason = walk_trade(
             b["ts"].to_list(),
             b["close_ts"].to_list(),
@@ -130,6 +150,7 @@ def auto_close(
             SIDES[e["side"]],
             risk_pts,
             flat_at,
+            flat_ts=late,
         )
         if px is None or reason == "open":
             continue

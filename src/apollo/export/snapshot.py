@@ -99,6 +99,7 @@ def export_snapshot(
         try:
             _write(out, f"{what}/{code}.json", make())
         except Exception as e:  # noqa: BLE001 - one symbol's failure must not stop the others
+            (out / f"{what}/{code}.json").unlink(missing_ok=True)  # never an earlier run's file
             missing.append({"what": what, "symbol": code, "reason": str(e)[:200]})
 
     _write(
