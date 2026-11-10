@@ -91,7 +91,7 @@ export function Chart({ symbol, tf }: { symbol: string; tf: Tf }) {
     <div className="relative min-h-[440px] min-w-0">
       <div ref={box} className="absolute inset-0" />
       {(poll.loading && !poll.data) || empty || (poll.error && !poll.data?.length) ? (
-        <div className="absolute inset-0 grid place-items-center bg-bg p-6">
+        <div className="absolute inset-0 z-10 grid place-items-center bg-bg p-6">
           {poll.error && !poll.data?.length ? (
             <ErrorLine error={poll.error} />
           ) : empty ? (

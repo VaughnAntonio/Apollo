@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Chart } from './components/Chart'
+import { TickerPicker } from './components/TickerPicker'
 import { TopBar } from './components/TopBar'
+import { Wordmark } from './components/Wordmark'
 import { TIMEFRAMES, type Tf } from './lib/chart'
 import { get, set } from './lib/storage'
 
@@ -10,7 +12,7 @@ const storedTf = (): Tf => {
 }
 
 export default function App() {
-  const [symbol] = useState(() => get('apollo.symbol', 'MNQ'))
+  const [symbol, setSymbol] = useState(() => get('apollo.symbol', 'MNQ'))
   const [tf, setTf] = useState<Tf>(storedTf)
   const [trades, setTrades] = useState(() => get('apollo.trades', 'on') !== 'off')
 
@@ -21,7 +23,12 @@ export default function App() {
         onTf={(t) => (setTf(t), set('apollo.tf', t))}
         trades={trades}
         onTrades={(on) => (setTrades(on), set('apollo.trades', on ? 'on' : 'off'))}
-        left={<span className="text-base font-semibold tracking-tight uppercase">Apollo</span>}
+        left={
+          <>
+            <Wordmark />
+            <TickerPicker value={symbol} onChange={setSymbol} />
+          </>
+        }
       />
       <main className="grid min-h-0 grid-cols-1 md:grid-cols-[1fr_260px]">
         <Chart symbol={symbol} tf={tf} />
