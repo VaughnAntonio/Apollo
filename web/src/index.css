@@ -1,0 +1,78 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/geist';
+@import '@fontsource-variable/geist-mono';
+
+/* Light tokens from Portfoliov2 src/index.css; dark tokens derived from them (spec 5.2). */
+:root {
+  --bg: #e8eaec;
+  --ink: #262933;
+  --muted: #565a64;
+  --line: #c4c7cd;
+  --soft: #dfe1e4;
+  --panel: #f4f4f4;
+  --brand: #3d5a4a;
+  --brand-fg: #f4f4f4;
+  --down: #a32d2d;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #17191e;
+    --ink: #e3e5e8;
+    --muted: #8b9099;
+    --line: #2e323a;
+    --soft: #22252c;
+    --panel: #1d2026;
+    --brand: #7fa68f;
+    --brand-fg: #17191e;
+    --down: #d26a66;
+    color-scheme: dark;
+  }
+}
+:root[data-theme='dark'] {
+  --bg: #17191e;
+  --ink: #e3e5e8;
+  --muted: #8b9099;
+  --line: #2e323a;
+  --soft: #22252c;
+  --panel: #1d2026;
+  --brand: #7fa68f;
+  --brand-fg: #17191e;
+  --down: #d26a66;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-soft: var(--soft);
+  --color-panel: var(--panel);
+  --color-brand: var(--brand);
+  --color-brand-fg: var(--brand-fg);
+  --color-down: var(--down);
+  --radius-sm: 4px;
+  --font-sans: 'Geist Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'Geist Mono Variable', ui-monospace, monospace;
+}
+
+@layer base {
+  * {
+    border-color: var(--line);
+  }
+  html,
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font: 13px/1.4 var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior: none; /* the page itself never bounces or scrolls at its edges */
+  }
+  .font-mono {
+    font-variant-numeric: tabular-nums;
+  }
+  button {
+    cursor: pointer;
+  }
+}
