@@ -47,3 +47,16 @@ def test_one_failing_command_does_not_skip_the_rest_of_its_symbol():
     ]
     assert len(research) == 12
     assert all('|| echo "::warning::' in ln for ln in research)
+
+
+def test_ci_runs_with_a_read_only_token():
+    # CI also runs on pull requests, so it never needs to write to the repo
+    text = Path(".github/workflows/ci.yml").read_text()
+    assert "\npermissions:\n  contents: read\n" in text
+
+
+def test_no_workflow_puts_event_text_into_a_shell():
+    # ${{ github.event.* }} inside a run step is the usual script-injection route
+    for path in Path(".github/workflows").glob("*.yml"):
+        runs = re.findall(r"run: (?:\|\n(?:\s{8,}.*\n?)+|.*)", path.read_text())
+        assert not any("${{ github.event" in r or "${{ github.head_ref" in r for r in runs), path
