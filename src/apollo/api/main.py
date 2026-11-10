@@ -6,7 +6,9 @@ Run: python -m apollo.api.main [--port 8000]
 import argparse
 import json
 import re
+import threading
 import uuid
+from collections import defaultdict
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
@@ -150,14 +152,17 @@ def create_app(
     store = JournalStore(journal_path or root / "journal.duckdb")
     symbols = load_symbols()
     cache: dict[tuple, tuple[str, Any]] = {}  # (kind, code) -> (stamp, value)
+    locks: defaultdict[tuple, threading.Lock] = defaultdict(threading.Lock)
 
     def cached(kind: str, code: str, stamp: str, make: Callable[[], Any]) -> Any:
-        hit = cache.get((kind, code))
-        if hit and hit[0] == stamp:
-            return hit[1]
-        value = make()
-        cache[(kind, code)] = (stamp, value)
-        return value
+        # One lock per (kind, code): requests that arrive together wait for one refit, not four
+        with locks[(kind, code)]:
+            hit = cache.get((kind, code))
+            if hit and hit[0] == stamp:
+                return hit[1]
+            value = make()
+            cache[(kind, code)] = (stamp, value)
+            return value
 
     def known(code: str) -> str:
         if code not in symbols:

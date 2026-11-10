@@ -27,7 +27,9 @@ function colours(chart: IChartApi, series: ISeriesApi<'Candlestick'>) {
   series.applyOptions(candleColours(css))
 }
 
-export function Chart({ symbol, tf }: { symbol: string; tf: Tf }) {
+type Props = { symbol: string; tf: Tf; onLastClose?: (close: number | null) => void }
+
+export function Chart({ symbol, tf, onLastClose }: Props) {
   const box = useRef<HTMLDivElement>(null)
   const chartRef = useRef<{ chart: IChartApi; series: ISeriesApi<'Candlestick'> } | null>(null)
   const bars = useRef<{ key: string; list: Bar[]; drawn: number }>({ key: '', list: [], drawn: 0 })
@@ -85,6 +87,9 @@ export function Chart({ symbol, tf }: { symbol: string; tf: Tf }) {
     }
     bars.current.drawn = list.at(-1)?.time ?? 0
   }, [poll.data, key])
+
+  const lastClose = poll.data?.at(-1)?.close ?? null
+  useEffect(() => onLastClose?.(lastClose), [lastClose, onLastClose])
 
   const empty = poll.data !== undefined && poll.data.length === 0
   return (

@@ -238,3 +238,25 @@ def test_web_origin_can_move_to_another_local_port(tmp_path):
     c = TestClient(app, base_url="http://localhost")
     assert c.get("/healthz", headers={"Origin": "http://localhost:5174"}).status_code == 200
     assert c.get("/healthz", headers={"Origin": "http://localhost:5173"}).status_code == 403
+
+
+def test_concurrent_first_calls_share_one_forecast(tmp_path):
+    import threading
+    import time
+    from concurrent.futures import ThreadPoolExecutor
+
+    calls, lock = [], threading.Lock()
+
+    def slow_forecast(root, code):
+        with lock:
+            calls.append(code)
+        time.sleep(0.3)
+        return {"latest": {}, "research_only": True}
+
+    app = create_app(tmp_path, journal_path=tmp_path / "j.duckdb", forecast_fn=slow_forecast)
+    c = TestClient(app, base_url="http://localhost")
+    with ThreadPoolExecutor(4) as pool:
+        codes = list(
+            pool.map(lambda _: c.get("/forecast", params={"symbol": "MNQ"}).status_code, range(4))
+        )
+    assert codes == [200] * 4 and calls == ["MNQ"]

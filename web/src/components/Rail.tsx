@@ -1,0 +1,250 @@
+import { useState, type FormEvent, type ReactNode } from 'react'
+import { api, ApiError } from '../api/client'
+import type { CheckRow, Entry, Signal } from '../api/types'
+import { usePoll } from '../api/usePoll'
+import { fmtPct, fmtPrice, fmtR, openR } from '../lib/trade'
+import { Empty, ErrorLine, Skeleton } from './State'
+
+const STEPS: Record<string, string> = {
+  daily_bias: 'Daily bias',
+  '4h': '4H',
+  '1h': '1H',
+  '15m': '15m',
+  '5m_trigger': '5m trigger',
+}
+
+const DOT: Record<CheckRow['status'], string> = {
+  pass: 'bg-ink border-ink',
+  wait: 'border-ink',
+  fail: 'bg-down border-down',
+  no_data: 'border-muted border-dashed',
+}
+
+type Props = {
+  symbol: string
+  openTrade: Entry | null
+  lastClose: number | null
+  onTaken: (id: number) => void
+  onChanged: () => void
+}
+
+function Section({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <section className="border-b px-5 py-4">
+      <h2 className="mb-3 font-mono text-[10px] font-medium tracking-widest text-muted uppercase">{label}</h2>
+      {children}
+    </section>
+  )
+}
+
+function Kv({ k, v }: { k: string; v: ReactNode }) {
+  return (
+    <div className="flex justify-between py-1 font-mono">
+      <span className="font-sans text-muted">{k}</span>
+      <span>{v}</span>
+    </div>
+  )
+}
+
+const btn = 'rounded-sm bg-brand px-3 py-1.5 font-mono text-[10px] font-medium tracking-widest text-brand-fg uppercase'
+const ghost = 'rounded-sm border px-3 py-1.5 font-mono text-[10px] font-medium tracking-widest uppercase'
+const field = 'w-full rounded-sm border bg-transparent px-2 py-1 font-mono'
+
+function Checklist({ signal }: { signal: Signal }) {
+  if (signal.status === 'no_model') return <Empty>Model not trained for this symbol</Empty>
+  if (!signal.checklist.length) return <Empty>No checklist yet</Empty>
+  return (
+    <ul>
+      {signal.checklist.map((r) => (
+        <li key={r.step} className="grid grid-cols-[12px_auto_1fr] items-start gap-2.5 py-1.5">
+          <span aria-label={r.status} className={`mt-1 size-[7px] rounded-full border ${DOT[r.status]}`} />
+          <span>{STEPS[r.step] ?? r.step}</span>
+          <span className="text-right font-mono text-[11px] text-muted">{r.detail}</span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function TakeTrade({ symbol, signal, onTaken }: { symbol: string; signal: Signal; onTaken: (id: number) => void }) {
+  const [form, setForm] = useState<{ fill: string; size: string } | null>(null)
+  const [error, setError] = useState<ApiError | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  if (!form) {
+    return (
+      <button
+        type="button"
+        className={`${btn} mt-3 w-full`}
+        onClick={() => setForm({ fill: String(signal.entry ?? ''), size: String(signal.contracts ?? 1) })}
+      >
+        Take trade
+      </button>
+    )
+  }
+  const save = async (e: FormEvent) => {
+    e.preventDefault()
+    setBusy(true)
+    setError(null)
+    try {
+      const { id } = await api.journal.take(symbol, { fill: Number(form.fill), size: Number(form.size) })
+      setForm(null)
+      onTaken(id)
+    } catch (err) {
+      setError(err instanceof ApiError ? err : new ApiError(String(err), -1))
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <form onSubmit={save} className="mt-3 grid gap-2">
+      <div className="grid grid-cols-2 gap-2">
+        <label className="grid gap-1 text-muted">
+          Fill
+          <input inputMode="decimal" className={field} value={form.fill} onChange={(e) => setForm({ ...form, fill: e.target.value })} />
+        </label>
+        <label className="grid gap-1 text-muted">
+          Contracts
+          <input inputMode="numeric" className={field} value={form.size} onChange={(e) => setForm({ ...form, size: e.target.value })} />
+        </label>
+      </div>
+      <div className="flex gap-2">
+        <button type="submit" disabled={busy} className={btn}>
+          Save trade
+        </button>
+        <button type="button" className={ghost} onClick={() => (setForm(null), setError(null))}>
+          Cancel
+        </button>
+      </div>
+      {error && <ErrorLine error={error} />}
+    </form>
+  )
+}
+
+function OpenTrade({ trade, lastClose, onChanged }: { trade: Entry; lastClose: number | null; onChanged: () => void }) {
+  const [exit, setExit] = useState<string | null>(null)
+  const [error, setError] = useState<ApiError | null>(null)
+  const r = lastClose === null ? null : openR(trade, lastClose)
+
+  const close = async (body: { exit: number; at?: string; reason?: string }) => {
+    setError(null)
+    try {
+      await api.journal.close(trade.id, body)
+      setExit(null)
+      onChanged()
+    } catch (err) {
+      setError(err instanceof ApiError ? err : new ApiError(String(err), -1))
+    }
+  }
+
+  return (
+    <div>
+      <div className="mb-2.5 flex items-baseline justify-between">
+        <strong className={`text-[22px] font-semibold tracking-tight ${trade.side === 'short' ? 'text-down' : 'text-brand'}`}>
+          {trade.side === 'short' ? 'Short' : 'Long'}
+        </strong>
+        <span className="font-mono">{`${trade.size ?? ''} ${trade.symbol}`}</span>
+      </div>
+      <Kv k="Entry" v={fmtPrice(trade.entry)} />
+      <Kv k="Stop" v={fmtPrice(trade.stop)} />
+      <Kv k="Target" v={fmtPrice(trade.target)} />
+      <Kv k="Open R" v={<span className={r !== null && r < 0 ? 'text-down' : 'text-brand'}>{fmtR(r)}</span>} />
+      {trade.needs_confirm && trade.exit !== null ? (
+        <div className="mt-3 grid gap-2">
+          <p className="text-muted">{`Closed at ${fmtPrice(trade.exit)} (${trade.exit_reason?.replace('_auto', '')}). Check the fill.`}</p>
+          <button
+            type="button"
+            className={btn}
+            onClick={() => close({ exit: trade.exit!, at: trade.closed_at ?? undefined, reason: trade.exit_reason ?? 'manual' })}
+          >
+            Confirm exit
+          </button>
+        </div>
+      ) : exit === null ? (
+        <button type="button" className={`${ghost} mt-3 w-full`} onClick={() => setExit(lastClose === null ? '' : String(lastClose))}>
+          Close trade
+        </button>
+      ) : (
+        <form
+          className="mt-3 grid gap-2"
+          onSubmit={(e) => (e.preventDefault(), close({ exit: Number(exit), reason: 'manual' }))}
+        >
+          <label className="grid gap-1 text-muted">
+            Exit
+            <input inputMode="decimal" className={field} value={exit} onChange={(e) => setExit(e.target.value)} />
+          </label>
+          <div className="flex gap-2">
+            <button type="submit" className={btn}>
+              Save exit
+            </button>
+            <button type="button" className={ghost} onClick={() => setExit(null)}>
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+      {error && <ErrorLine error={error} />}
+    </div>
+  )
+}
+
+function SignalPanel({ symbol, signal, onTaken }: { symbol: string; signal: Signal; onTaken: (id: number) => void }) {
+  if (signal.status === 'no_model') return <Empty>No signal for this symbol</Empty>
+  if (signal.status !== 'trigger') return <Empty>No trade signal</Empty>
+  const long = signal.direction === 'bull'
+  return (
+    <div>
+      <div className="mb-2.5 flex items-baseline justify-between">
+        <strong className={`text-[22px] font-semibold tracking-tight ${long ? 'text-brand' : 'text-down'}`}>{long ? 'Long' : 'Short'}</strong>
+        <span className="font-mono">{`${signal.contracts} ${signal.symbol}`}</span>
+      </div>
+      <Kv k="Entry" v={fmtPrice(signal.entry)} />
+      <Kv k="Stop" v={fmtPrice(signal.stop)} />
+      <Kv k="Target" v={fmtPrice(signal.target)} />
+      <Kv k="Risk of limit" v={fmtPct(signal.risk_of_limit)} />
+      <div className="mt-1 h-[3px] bg-soft">
+        <i className="block h-full bg-ink" style={{ width: `${Math.min(100, (signal.risk_of_limit ?? 0) * 100)}%` }} />
+      </div>
+      <TakeTrade symbol={symbol} signal={signal} onTaken={onTaken} />
+    </div>
+  )
+}
+
+export function Rail({ symbol, openTrade, lastClose, onTaken, onChanged }: Props) {
+  const sig = usePoll(() => api.signal(symbol), [symbol])
+  const fc = usePoll(() => api.forecast(symbol), [symbol], 3_600_000)
+  const mc = fc.data?.model_check
+
+  return (
+    <aside className="border-t md:overflow-auto md:border-t-0 md:border-l">
+      <Section label="Top-down">
+        {sig.data ? <Checklist signal={sig.data} /> : sig.error ? <ErrorLine error={sig.error} /> : <Skeleton rows={5} />}
+      </Section>
+      <Section label={openTrade ? 'Open trade' : 'Signal'}>
+        {openTrade ? (
+          <OpenTrade trade={openTrade} lastClose={lastClose} onChanged={onChanged} />
+        ) : sig.data ? (
+          <SignalPanel symbol={symbol} signal={sig.data} onTaken={onTaken} />
+        ) : sig.error ? (
+          <ErrorLine error={sig.error} />
+        ) : (
+          <Skeleton rows={4} />
+        )}
+      </Section>
+      <Section label="Model check, last 60 sessions">
+        {fc.data?.status === 'no_model' ? (
+          <Empty>Nothing to check yet</Empty>
+        ) : mc ? (
+          <>
+            <Kv k="Range hit rate" v={fmtPct(mc.range_hit)} />
+            <Kv k="Regime accuracy" v={fmtPct(mc.regime_accuracy)} />
+          </>
+        ) : fc.error ? (
+          <ErrorLine error={fc.error} />
+        ) : (
+          <Skeleton rows={2} />
+        )}
+      </Section>
+    </aside>
+  )
+}
