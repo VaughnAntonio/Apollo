@@ -95,3 +95,20 @@
     clip-path: inset(0);
   }
 }
+
+/* Portfoliov2 src/index.css, copied exactly. */
+@media (prefers-reduced-motion: no-preference) {
+  [data-menu][data-state='open'] { animation: menu-in 1s cubic-bezier(0.9, 0, 0.1, 1) both; }
+  [data-menu][data-state='closed'] { animation: menu-out 0.8s cubic-bezier(0.9, 0, 0.1, 1) both; }
+  [data-menu][data-state='open'] [data-menu-item] {
+    animation: link-in 0.75s cubic-bezier(0.7, 0, 0.3, 1) both;
+    animation-delay: calc(0.3s + var(--i) * 0.05s);
+  }
+  [data-menu][data-state='closed'] [data-menu-item] {
+    animation: link-out 0.5s cubic-bezier(0.7, 0, 0.3, 1) both;
+    animation-delay: calc(var(--r) * 0.03s);
+  }
+}
+@keyframes menu-out { from { clip-path: inset(0); } to { clip-path: inset(0 0 100% 0); } }
+@keyframes link-in { from { transform: translateY(100%) rotate(5deg); } to { transform: none; } }
+@keyframes link-out { from { transform: none; } to { transform: translateY(100%) rotate(5deg); } }

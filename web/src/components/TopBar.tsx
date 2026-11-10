@@ -7,12 +7,14 @@ type Props = {
   trades: boolean
   onTrades: (on: boolean) => void
   left?: ReactNode
+  chart?: boolean
 }
 
-export function TopBar({ tf, onTf, trades, onTrades, left }: Props) {
+export function TopBar({ tf, onTf, trades, onTrades, left, chart = true }: Props) {
   return (
     <header className="flex flex-wrap items-center gap-6 border-b px-5 py-3">
       {left}
+      {chart && (
       <nav aria-label="Timeframe" className="flex gap-0.5">
         {TIMEFRAMES.map((t) => (
           <button
@@ -26,7 +28,9 @@ export function TopBar({ tf, onTf, trades, onTrades, left }: Props) {
           </button>
         ))}
       </nav>
+      )}
       <div className="ml-auto flex items-center gap-[18px] font-mono text-muted">
+        {chart && (
         <button type="button" aria-pressed={trades} onClick={() => onTrades(!trades)} className="flex items-center gap-1.5">
           <span
             aria-hidden="true"
@@ -34,6 +38,7 @@ export function TopBar({ tf, onTf, trades, onTrades, left }: Props) {
           />
           Trades
         </button>
+        )}
         <span>Delayed 10m</span>
       </div>
     </header>

@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { api } from './api/client'
 import { usePoll } from './api/usePoll'
 import { Chart } from './components/Chart'
+import { Menu, useHashPage, type Page } from './components/Menu'
+import { Placeholder } from './components/Placeholder'
 import { Rail } from './components/Rail'
 import { TickerPicker } from './components/TickerPicker'
 import { TopBar } from './components/TopBar'
@@ -14,7 +16,13 @@ const storedTf = (): Tf => {
   return TIMEFRAMES.some((x) => x.tf === t) ? t : '5m'
 }
 
+const TITLES: Record<Exclude<Page, 'chart'>, string> = { backtest: 'Backtest', models: 'Models', 'case-study': 'Case study' }
+
+export type SheetState = { open: boolean; mode: 'view' | 'new'; id: number | null }
+
 export default function App() {
+  const [page, go] = useHashPage()
+  const [, setSheet] = useState<SheetState>({ open: false, mode: 'view', id: null })
   const [symbol, setSymbol] = useState(() => get('apollo.symbol', 'MNQ'))
   const [tf, setTf] = useState<Tf>(storedTf)
   const [trades, setTrades] = useState(() => get('apollo.trades', 'on') !== 'off')
@@ -42,35 +50,49 @@ export default function App() {
   return (
     <div className="grid min-h-[100dvh] grid-rows-[auto_1fr_auto] bg-bg text-ink md:h-[100dvh] md:overflow-hidden">
       <TopBar
+        chart={page === 'chart'}
         tf={tf}
         onTf={(t) => (setTf(t), set('apollo.tf', t))}
         trades={trades}
         onTrades={(on) => (setTrades(on), set('apollo.trades', on ? 'on' : 'off'))}
         left={
           <>
+            <Menu
+              page={page}
+              onNavigate={go}
+              onJournal={() => setSheet({ open: true, mode: 'view', id: null })}
+              onNewEntry={() => setSheet({ open: true, mode: 'new', id: null })}
+            />
             <Wordmark />
             <TickerPicker value={symbol} onChange={setSymbol} />
           </>
         }
       />
-      <main className="grid min-h-0 grid-cols-1 md:grid-cols-[1fr_260px]">
-        <Chart
-          symbol={symbol}
-          tf={tf}
-          entries={journal.data}
-          openTrade={openTrade}
-          trades={trades}
-          onLastClose={setLastClose}
-        />
-        <Rail
-          symbol={symbol}
-          openTrade={openTrade}
-          lastClose={lastClose}
-          onTaken={journal.refresh}
-          onChanged={journal.refresh}
-        />
-      </main>
-      <footer className="flex justify-between border-t px-5 py-2.5 font-mono text-[11px] text-muted">
+      {page === 'chart' ? (
+        <main className="grid min-h-0 grid-cols-1 md:grid-cols-[1fr_260px]">
+          <Chart
+            symbol={symbol}
+            tf={tf}
+            entries={journal.data}
+            openTrade={openTrade}
+            trades={trades}
+            onLastClose={setLastClose}
+          onMarkerClick={(id) => setSheet({ open: true, mode: "view", id })}
+          />
+          <Rail
+            symbol={symbol}
+            openTrade={openTrade}
+            lastClose={lastClose}
+            onTaken={journal.refresh}
+            onChanged={journal.refresh}
+          />
+        </main>
+      ) : (
+        <main className="overflow-auto">
+          <Placeholder title={TITLES[page]} />
+        </main>
+      )}
+      <footer className="flex flex-wrap justify-between gap-x-4 border-t px-5 py-2.5 font-mono text-[11px] text-muted">
         <span>Research tool. Not financial advice.</span>
         <span>Data: Yahoo Finance</span>
       </footer>
