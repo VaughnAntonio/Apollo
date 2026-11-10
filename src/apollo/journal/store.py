@@ -6,9 +6,10 @@ opening time can't be edited after the entry is saved.
 """
 
 import json
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import duckdb
 
@@ -18,7 +19,19 @@ SIDES = {"long": 1.0, "short": -1.0}
 STAGES = {"backtest", "forward_test", "eval", "funded", "live"}
 SOURCES = {"signal", "manual", "imported"}
 GRADES = {"A", "B", "C", "E"}
-FROZEN = {"id", "model_snapshot", "initial_stop", "source", "opened_at", "import_key"}
+NY = ZoneInfo("America/New_York")
+FROZEN = {
+    "id",
+    "model_snapshot",
+    "initial_stop",
+    "source",
+    "opened_at",
+    "import_key",
+    "imported_r",  # editing these would rewrite a trade's R
+    "imported_pnl",
+    "scaled",
+}
+TIMES = ("opened_at", "closed_at")
 COLUMNS = {
     "id": "INTEGER PRIMARY KEY DEFAULT nextval('journal_id')",
     "opened_at": "TIMESTAMPTZ NOT NULL",
@@ -49,6 +62,11 @@ COLUMNS = {
     "import_key": "VARCHAR UNIQUE",
 }
 JSON_FIELDS = ("tags", "model_snapshot")
+
+
+def _ny(t: Any) -> Any:
+    """Times without a zone are New York time (a browser's datetime-local sends exactly that)."""
+    return t.replace(tzinfo=NY) if isinstance(t, datetime) and t.tzinfo is None else t
 
 
 def _validate(e: dict[str, Any]) -> None:
@@ -83,6 +101,7 @@ class JournalStore:
             db.execute("CREATE SEQUENCE IF NOT EXISTS journal_id START 1")
             cols = ", ".join(f"{k} {v}" for k, v in COLUMNS.items())
             db.execute(f"CREATE TABLE IF NOT EXISTS journal ({cols})")
+            db.execute("CREATE TABLE IF NOT EXISTS signal_days (day DATE PRIMARY KEY)")
 
     def _db(self) -> duckdb.DuckDBPyConnection:
         return duckdb.connect(str(self.path))
@@ -115,6 +134,9 @@ class JournalStore:
             raise ValueError(f"unknown fields: {sorted(unknown)}")
         _validate(e)
         e["initial_stop"] = e.get("stop")
+        for f in TIMES:
+            if f in e:
+                e[f] = _ny(e[f])
         for f in JSON_FIELDS:
             if f in e:
                 e[f] = json.dumps(e[f]) if e[f] is not None else None
@@ -134,6 +156,15 @@ class JournalStore:
             names = [d[0] for d in cur.description]
         return self._row(row, names) if row else None
 
+    def record_signal_day(self, day: date) -> None:
+        """Remember that a trade signal fired on this NY date, for the "skipped" stat."""
+        with self._db() as db:
+            db.execute("INSERT OR IGNORE INTO signal_days VALUES (?)", [day])
+
+    def signal_days(self) -> list[date]:
+        with self._db() as db:
+            return [r[0] for r in db.execute("SELECT day FROM signal_days ORDER BY day").fetchall()]
+
     def list(
         self,
         symbol: str | None = None,
@@ -144,8 +175,8 @@ class JournalStore:
         where, args = [], []
         for col, op, val in (
             ("symbol", "=", symbol),
-            ("opened_at", ">=", start),
-            ("opened_at", "<", end),
+            ("opened_at", ">=", _ny(start)),
+            ("opened_at", "<", _ny(end)),
             ("source", "=", source),
         ):
             if val is not None:
@@ -170,7 +201,7 @@ class JournalStore:
             raise KeyError(id)
         _validate(current | changes)
         vals = {
-            k: (json.dumps(v) if k in JSON_FIELDS and v is not None else v)
+            k: (json.dumps(v) if k in JSON_FIELDS and v is not None else _ny(v))
             for k, v in changes.items()
         }
         if vals:

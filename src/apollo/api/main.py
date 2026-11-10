@@ -7,12 +7,14 @@ import argparse
 import json
 import uuid
 from collections.abc import Callable
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Any, Literal
+from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -26,6 +28,12 @@ TIMEFRAMES = ("1m", "5m", "15m", "1h", "4h", "1d")
 DEV_ORIGIN = "http://localhost:5173"  # Plan 6's Vite dev server; nothing else may call the API
 MAX_SHOT = 5 * 1024 * 1024
 IMAGE_TYPES = {"image/png": "png", "image/jpeg": "jpg"}
+NY = ZoneInfo("America/New_York")
+Price = Annotated[float, Field(allow_inf_nan=False)]
+Fees = Annotated[float, Field(ge=0, allow_inf_nan=False)]
+Size = Annotated[int, Field(gt=0, strict=True)]
+Stage = Literal["backtest", "forward_test", "eval", "funded", "live"]
+Grade = Literal["A", "B", "C", "E"]
 
 
 class JournalIn(BaseModel):
@@ -33,34 +41,50 @@ class JournalIn(BaseModel):
     opened_at: datetime
     symbol: str
     side: Literal["long", "short"]
-    entry: float | None = None
-    stop: float | None = None
-    target: float | None = None
-    size: int = Field(gt=0)
-    fees: float = 0.0
+    entry: Price | None = None
+    stop: Price | None = None
+    target: Price | None = None
+    size: Size
+    fees: Fees = 0.0
     account: str | None = None
-    stage: Literal["backtest", "forward_test", "eval", "funded", "live"] | None = None
+    stage: Stage | None = None
     strategy: str | None = None
-    grade: Literal["A", "B", "C", "E"] | None = None
+    grade: Grade | None = None
     tags: list[str] = []
     notes: str | None = None
 
 
 class JournalPatch(BaseModel):
-    model_config = ConfigDict(
-        extra="allow"
-    )  # the store decides what may change and rejects the rest
+    """What may change after saving. Frozen fields and screenshots aren't here, so they're 422s."""
+
+    model_config = ConfigDict(extra="forbid")
+    closed_at: datetime | None = None
+    side: Literal["long", "short"] | None = None
+    entry: Price | None = None
+    stop: Price | None = None
+    target: Price | None = None
+    exit: Price | None = None
+    size: Size | None = None
+    fees: Fees | None = None
+    account: str | None = None
+    stage: Stage | None = None
+    strategy: str | None = None
+    grade: Grade | None = None
+    tags: list[str] | None = None
+    notes: str | None = None
+    exit_reason: str | None = None
+    needs_confirm: bool | None = None
 
 
 class TakeIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    fill: float | None = None
-    size: int | None = Field(default=None, gt=0)
+    fill: Price | None = None
+    size: Size | None = None
 
 
 class CloseIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    exit: float
+    exit: Price
     at: datetime | None = None
     reason: str = "manual"
 
@@ -96,6 +120,16 @@ def create_app(
     app.add_middleware(
         CORSMiddleware, allow_origins=[DEV_ORIGIN], allow_methods=["*"], allow_headers=["*"]
     )
+    # CORS only hides responses; these two stop other sites and DNS rebinding reaching the journal
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost"])
+
+    @app.middleware("http")
+    async def same_origin_only(request: Request, call_next):
+        origin = request.headers.get("origin")
+        if origin is not None and origin != DEV_ORIGIN:
+            return JSONResponse({"detail": "origin not allowed"}, status_code=403)
+        return await call_next(request)
+
     store = JournalStore(journal_path or root / "journal.duckdb")
     symbols = load_symbols()
     cache: dict[tuple, tuple[str, Any]] = {}  # (kind, code) -> (stamp, value)
@@ -158,14 +192,22 @@ def create_app(
         if not symbols[symbol].model_enabled:
             return {"status": "no_model", "research_only": True}
         return cached(
-            "forecast", symbol, date.today().isoformat(), lambda: forecast_fn(root, symbol)
+            "forecast",
+            symbol,
+            datetime.now(NY).date().isoformat(),
+            lambda: forecast_fn(root, symbol),
         )
 
     def signal_now(symbol: str) -> dict:
         now = datetime.now(UTC)
-        return cached(
-            "signal", symbol, now.strftime("%Y-%m-%dT%H:%M"), lambda: signal_fn(root, symbol, now)
-        )
+
+        def make() -> dict:
+            sig = signal_fn(root, symbol, now)
+            if sig.get("status") == "trigger":
+                store.record_signal_day(sig["as_of"].astimezone(NY).date())
+            return sig
+
+        return cached("signal", symbol, now.strftime("%Y-%m-%dT%H:%M"), make)
 
     @app.get("/signal")
     def signal(symbol: str) -> dict:
@@ -175,7 +217,8 @@ def create_app(
     @app.get("/journal/stats")
     def stats() -> dict:
         entries = store.list()
-        return {"stats": journal_stats(entries, signal_days=[]), "calendar": calendar(entries)}
+        days = store.signal_days()
+        return {"stats": journal_stats(entries, signal_days=days), "calendar": calendar(entries)}
 
     @app.post("/journal/take")
     def take(body: TakeIn, symbol: str = "MNQ") -> dict:
@@ -205,10 +248,7 @@ def create_app(
 
     @app.patch("/journal/{id}")
     def patch(id: int, body: JournalPatch) -> dict:
-        changes = body.model_dump()
-        if "screenshot" in changes:
-            raise ValueError("upload screenshots through /journal/{id}/screenshot")
-        return store.update(id, changes)
+        return store.update(id, body.model_dump(exclude_unset=True))
 
     @app.delete("/journal/{id}")
     def delete(id: int) -> dict:
@@ -222,6 +262,8 @@ def create_app(
 
     @app.post("/journal/{id}/screenshot")
     async def screenshot(id: int, file: Annotated[UploadFile, File()]) -> dict:
+        if store.get(id) is None:
+            raise HTTPException(404, "no such entry")
         ext = IMAGE_TYPES.get(file.content_type or "")
         if ext is None:
             raise ValueError("screenshots must be PNG or JPEG")

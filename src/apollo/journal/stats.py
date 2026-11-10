@@ -4,6 +4,9 @@ The key split is signal / manual / skipped: did following Apollo's signals beat 
 calls, and how often were signals left untaken? Only closed trades (with an R) count.
 
 Run: python -m apollo.journal.stats --db data_store/journal.duckdb --out docs/reviews/journal-export.csv
+
+DuckDB lets one process write the file at a time. The API opens it only for each request, so
+the export works while the API runs, but it can fail if a request is in flight; run it again.
 """
 
 import argparse

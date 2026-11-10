@@ -53,6 +53,12 @@ def take_trade(
     """Journal the current signal as a trade (source "signal")."""
     if signal.get("status") != "trigger":
         raise ValueError("there is no trade signal right now")
+    if any(
+        e["exit"] is None and e["source"] != "imported" for e in store.list(symbol=signal["symbol"])
+    ):
+        raise ValueError(
+            f"a {signal['symbol']} trade is already open; close it first"
+        )  # one position per symbol
     contracts = size if size is not None else signal["contracts"]
     cfg, sym = load_trade_config(), load_symbols()[signal["symbol"]]
     commission = (
@@ -62,7 +68,7 @@ def take_trade(
     )
     return store.add(
         {
-            "opened_at": signal["as_of"],
+            "opened_at": signal.get("entry_ts") or signal["as_of"],  # the fill bar, not the click
             "symbol": signal["symbol"],
             "side": "long" if signal["direction"] == "bull" else "short",
             "entry": fill if fill is not None else signal["entry"],
@@ -91,19 +97,24 @@ def auto_close(
     store: JournalStore, bars_by_symbol: dict[str, pl.DataFrame], now: datetime
 ) -> list[int]:
     """Close open trades whose stop, target or 16:00 ET flat time has passed in the bars."""
-    flat_at = load_trade_config().flat_at
+    flat_at, now = load_trade_config().flat_at, now.astimezone(UTC)
     closed = []
     for e in store.list():
         bars = bars_by_symbol.get(e["symbol"])
         if e["exit"] is not None or e["source"] == "imported" or bars is None or bars.is_empty():
             continue
+        if any(e.get(f) is None for f in ("side", "entry", "initial_stop", "stop", "target")):
+            continue  # a manual trade without a full plan can only be closed by hand
         b = bars.sort("ts").filter(pl.col("ts") <= now)
         step = int(np.diff(b["ts"].dt.epoch("s").to_numpy()).min()) // 60 if b.height > 1 else 60
         b = b.with_columns(close_ts=bar_close({5: "5m", 15: "15m"}.get(step, "1h")))  # type: ignore[arg-type]
         b = b.filter(pl.col("close_ts") <= now)  # only bars that have finished
         stamps = np.array([t.timestamp() for t in b["ts"]])
         opened = e["opened_at"]
-        k = max(int(np.searchsorted(stamps, opened.timestamp(), side="right")) - 1, 0)
+        # first bar opening at or after the fill: the fill bar's earlier prices never count
+        k = int(np.searchsorted(stamps, opened.timestamp(), side="left"))
+        if k >= len(stamps):
+            continue
         risk_pts = abs(e["entry"] - e["initial_stop"])
         px, at, reason = walk_trade(
             b["ts"].to_list(),

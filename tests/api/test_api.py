@@ -52,7 +52,7 @@ def client(tmp_path, bars):
         signal_fn=lambda root, code, now: TRIGGER | {"symbol": code},
         forecast_fn=lambda root, code: {"latest": {"proba": {"chop": 0.3}}, "research_only": True},
     )
-    return TestClient(app)
+    return TestClient(app, base_url="http://localhost")
 
 
 def test_health_symbols_and_bars(client):
@@ -68,7 +68,7 @@ def test_health_symbols_and_bars(client):
 
 def test_signal_no_model_for_stock(tmp_path):
     c = TestClient(
-        create_app(tmp_path, journal_path=tmp_path / "j.duckdb")
+        create_app(tmp_path, journal_path=tmp_path / "j.duckdb"), base_url="http://localhost"
     )  # the real signal function
     r = c.get("/signal", params={"symbol": "NVDA"})
     assert r.status_code == 200 and r.json()["status"] == "no_model"
@@ -130,7 +130,17 @@ def test_cors_only_vite_origin(client):
     ok = client.get("/healthz", headers={"Origin": "http://localhost:5173"})
     bad = client.get("/healthz", headers={"Origin": "https://evil.example"})
     assert ok.headers.get("access-control-allow-origin") == "http://localhost:5173"
-    assert "access-control-allow-origin" not in bad.headers
+    assert bad.status_code == 403  # other sites can't even send requests
+    assert (
+        client.get("/healthz", headers={"Host": "evil.example"}).status_code == 400
+    )  # DNS rebinding
+    i = client.post("/journal", json=MANUAL).json()["id"]
+    upload = client.post(
+        f"/journal/{i}/screenshot",
+        files={"file": ("x.png", b"\x89PNG", "image/png")},
+        headers={"Origin": "https://evil.example"},
+    )
+    assert upload.status_code == 403
 
 
 def test_backtest_summary_reads_report_without_running(client):
@@ -140,3 +150,46 @@ def test_backtest_summary_reads_report_without_running(client):
         client.get("/backtest/summary", params={"symbol": "MNQ", "layer": "1H-5m"}).status_code
         == 404
     )
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        {"exit": "abc"},
+        {"closed_at": "junk"},
+        {"notes": {"a": 1}},
+        {"size": True},
+        {"fees": -1},
+        {"imported_r": 9.9},
+        {"screenshot": "journal_media/x.png"},
+    ],
+)
+def test_bad_patch_422(client, bad):
+    i = client.post("/journal", json=MANUAL).json()["id"]
+    assert client.patch(f"/journal/{i}", json=bad).status_code == 422
+
+
+def test_nan_price_422(client):
+    body = json.dumps(MANUAL | {"entry": float("nan")})
+    r = client.post("/journal", content=body, headers={"content-type": "application/json"})
+    assert r.status_code == 422
+
+
+def test_screenshot_for_missing_entry_leaves_no_file(client, tmp_path):
+    r = client.post("/journal/9999/screenshot", files={"file": ("x.png", b"\x89PNG", "image/png")})
+    assert r.status_code == 404
+    assert (
+        not list((tmp_path / "journal_media").glob("*"))
+        if (tmp_path / "journal_media").exists()
+        else True
+    )
+
+
+def test_take_twice_refused(client):
+    assert client.post("/journal/take", json={}).status_code == 200
+    assert client.post("/journal/take", json={}).status_code == 422  # one open position per symbol
+
+
+def test_signal_days_feed_skipped(client):
+    client.get("/signal", params={"symbol": "MNQ"})  # a trigger nobody took
+    assert client.get("/journal/stats").json()["stats"]["skipped"] == ["2026-11-03"]

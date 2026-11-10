@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -6,6 +7,7 @@ from apollo.journal.store import JournalStore
 
 OPEN = datetime(2026, 11, 3, 15, 0, tzinfo=UTC)
 CLOSE = datetime(2026, 11, 3, 17, 0, tzinfo=UTC)
+NY = ZoneInfo("America/New_York")
 BULL = {
     "opened_at": OPEN,
     "symbol": "MNQ",
@@ -50,7 +52,18 @@ def test_moving_the_stop_does_not_change_r(tmp_path):
     assert e["r"] == pytest.approx(-1 * 2 * 2 / 9)  # measured against the original 2.25-point risk
 
 
-@pytest.mark.parametrize("field", ["model_snapshot", "initial_stop", "source", "opened_at"])
+@pytest.mark.parametrize(
+    "field",
+    [
+        "model_snapshot",
+        "initial_stop",
+        "source",
+        "opened_at",
+        "imported_r",
+        "imported_pnl",
+        "scaled",
+    ],
+)
 def test_frozen_fields(tmp_path, field):
     s = JournalStore(tmp_path / "j.duckdb")
     i = s.add(dict(BULL))
@@ -92,3 +105,11 @@ def test_tags_and_snapshot_roundtrip(tmp_path):
     e = s.get(i)
     assert e is not None
     assert e["tags"] == ["Gamba", "FOMC"] and e["model_snapshot"] == {"proba": {"chop": 0.6}}
+
+
+def test_naive_times_are_new_york(tmp_path):
+    s = JournalStore(tmp_path / "j.duckdb")
+    i = s.add(dict(BULL, opened_at=datetime(2026, 11, 10, 10)))
+    e = s.get(i)
+    assert e is not None and e["opened_at"] == datetime(2026, 11, 10, 10, tzinfo=NY)
+    assert s.list(start=datetime(2026, 11, 10, 9, 59), end=datetime(2026, 11, 10, 10, 1))

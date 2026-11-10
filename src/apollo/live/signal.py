@@ -69,6 +69,7 @@ def current_signal(
         "research_only": True,
         "direction": None,
         "entry": None,
+        "entry_ts": None,
         "stop": None,
         "target": None,
         "contracts": None,
@@ -182,6 +183,7 @@ def current_signal(
     return out | {
         "status": "trigger" if contracts > 0 else "waiting",
         "entry": trigger["entry"],
+        "entry_ts": trigger["entry_ts"],
         "stop": trigger["stop"],
         "target": trigger["target"],
         "contracts": contracts,
