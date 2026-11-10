@@ -124,7 +124,9 @@ function TakeTrade({ symbol, signal, onTaken }: { symbol: string; signal: Signal
 function OpenTrade({ trade, lastClose, onChanged }: { trade: Entry; lastClose: number | null; onChanged: () => void }) {
   const [exit, setExit] = useState<string | null>(null)
   const [error, setError] = useState<ApiError | null>(null)
-  const r = lastClose === null ? null : openR(trade, lastClose)
+  const done = trade.needs_confirm && trade.exit !== null
+  const at = done ? trade.exit : lastClose
+  const r = at === null ? null : openR(trade, at)
 
   const close = async (body: { exit: number; at?: string; reason?: string }) => {
     setError(null)
@@ -148,8 +150,8 @@ function OpenTrade({ trade, lastClose, onChanged }: { trade: Entry; lastClose: n
       <Kv k="Entry" v={fmtPrice(trade.entry)} />
       <Kv k="Stop" v={fmtPrice(trade.stop)} />
       <Kv k="Target" v={fmtPrice(trade.target)} />
-      <Kv k="Open R" v={<span className={r !== null && r < 0 ? 'text-down' : 'text-brand'}>{fmtR(r)}</span>} />
-      {trade.needs_confirm && trade.exit !== null ? (
+      <Kv k={done ? 'R at exit' : 'Open R'} v={<span className={r !== null && r < 0 ? 'text-down' : 'text-brand'}>{fmtR(r)}</span>} />
+      {done ? (
         <div className="mt-3 grid gap-2">
           <p className="text-muted">{`Closed at ${fmtPrice(trade.exit)} (${trade.exit_reason?.replace('_auto', '')}). Check the fill.`}</p>
           <button

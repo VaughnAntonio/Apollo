@@ -18,3 +18,13 @@ it('toNaiveIso keeps the wall-clock time and adds no zone', () => {
   expect(toNaiveIso('2026-11-10T10:00')).toBe('2026-11-10T10:00:00')
   expect(toNaiveIso('2026-11-10T10:00:30')).toBe('2026-11-10T10:00:30')
 })
+
+import { tickLabel } from '../../src/lib/time'
+
+it('axis ticks show the year, the month, the day or the time by tick type', () => {
+  const s = Date.UTC(2026, 0, 1, 15, 0) / 1000
+  expect(tickLabel(s, 0)).toBe('2026')
+  expect(tickLabel(s, 1)).toBe('Jan')
+  expect(tickLabel(s, 2)).toBe('1 Jan')
+  expect(tickLabel(s, 3)).toBe('10:00')
+})

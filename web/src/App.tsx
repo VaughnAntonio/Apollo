@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { api } from './api/client'
 import { usePoll } from './api/usePoll'
 import { Chart } from './components/Chart'
@@ -28,6 +28,16 @@ export default function App() {
       ) ?? null,
     [journal.data, symbol],
   )
+  // while a trade is open, let the API check later bars for its stop, target or flat time
+  const openId = openTrade && openTrade.exit === null ? openTrade.id : null
+  const refreshJournal = journal.refresh
+  const autoClose = usePoll(
+    async () => (openId === null ? { closed: [] } : api.journal.autoClose(symbol)),
+    [openId, symbol],
+  )
+  useEffect(() => {
+    if (autoClose.data?.closed.length) refreshJournal()
+  }, [autoClose.data, refreshJournal])
 
   return (
     <div className="grid min-h-[100dvh] grid-rows-[auto_1fr_auto] bg-bg text-ink md:h-[100dvh] md:overflow-hidden">
@@ -44,7 +54,14 @@ export default function App() {
         }
       />
       <main className="grid min-h-0 grid-cols-1 md:grid-cols-[1fr_260px]">
-        <Chart symbol={symbol} tf={tf} onLastClose={setLastClose} />
+        <Chart
+          symbol={symbol}
+          tf={tf}
+          entries={journal.data}
+          openTrade={openTrade}
+          trades={trades}
+          onLastClose={setLastClose}
+        />
         <Rail
           symbol={symbol}
           openTrade={openTrade}

@@ -1,17 +1,20 @@
 import {
   CandlestickSeries,
   createChart,
+  createSeriesMarkers,
+  type IPriceLine,
+  type ISeriesMarkersPluginApi,
   type IChartApi,
   type ISeriesApi,
   type Time,
   type UTCTimestamp,
 } from 'lightweight-charts'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api } from '../api/client'
-import type { Bar } from '../api/types'
+import type { Bar, Entry } from '../api/types'
 import { usePoll } from '../api/usePoll'
-import { candleColours, mergeBars, token, type Tf } from '../lib/chart'
-import { nyDate, nyDay, nyTime } from '../lib/time'
+import { candleColours, dayDots, mergeBars, palette, snapTo, token, tradeLines, tradeMarkers, type Tf } from '../lib/chart'
+import { nyDate, nyTime, tickLabel } from '../lib/time'
 import { Empty, ErrorLine, Skeleton } from './State'
 
 const sec = (t: Time) => t as number
@@ -27,9 +30,25 @@ function colours(chart: IChartApi, series: ISeriesApi<'Candlestick'>) {
   series.applyOptions(candleColours(css))
 }
 
-type Props = { symbol: string; tf: Tf; onLastClose?: (close: number | null) => void }
+type Props = {
+  symbol: string
+  tf: Tf
+  entries?: Entry[]
+  openTrade?: Entry | null
+  trades?: boolean
+  onLastClose?: (close: number | null) => void
+  onMarkerClick?: (id: number) => void
+}
 
-export function Chart({ symbol, tf, onLastClose }: Props) {
+export function Chart({ symbol, tf, entries = [], openTrade = null, trades = true, onLastClose, onMarkerClick }: Props) {
+  const [themeTick, setThemeTick] = useState(0)
+  const drawn = useRef<{ lines: IPriceLine[]; markers: ISeriesMarkersPluginApi<Time> | null; ids: Map<number, number> }>({
+    lines: [],
+    markers: null,
+    ids: new Map(),
+  })
+  const clickRef = useRef(onMarkerClick)
+  clickRef.current = onMarkerClick
   const box = useRef<HTMLDivElement>(null)
   const chartRef = useRef<{ chart: IChartApi; series: ISeriesApi<'Candlestick'> } | null>(null)
   const bars = useRef<{ key: string; list: Bar[]; drawn: number }>({ key: '', list: [], drawn: 0 })
@@ -53,14 +72,19 @@ export function Chart({ symbol, tf, onLastClose }: Props) {
       localization: { timeFormatter: (t: Time) => `${nyDate(sec(t))} ${nyTime(sec(t))}` },
       timeScale: {
         timeVisible: true,
-        // tick types 0–2 are year, month and day; the rest are times of day
-        tickMarkFormatter: (t: Time, type: number) => (type <= 2 ? nyDay(sec(t)) : nyTime(sec(t))),
+        tickMarkFormatter: (t: Time, type: number) => tickLabel(sec(t), type),
       },
     })
     const series = chart.addSeries(CandlestickSeries, {})
     chartRef.current = { chart, series }
+    drawn.current.markers = createSeriesMarkers(series, [])
+    // a click on a bar that carries a trade marker opens that trade
+    chart.subscribeClick((param) => {
+      const id = param.time === undefined ? undefined : drawn.current.ids.get(sec(param.time))
+      if (id !== undefined) clickRef.current?.(id)
+    })
     colours(chart, series)
-    const recolour = () => colours(chart, series)
+    const recolour = () => (colours(chart, series), setThemeTick((n) => n + 1))
     const watch = new MutationObserver(recolour)
     watch.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
     const media = window.matchMedia?.('(prefers-color-scheme: dark)')
@@ -87,6 +111,28 @@ export function Chart({ symbol, tf, onLastClose }: Props) {
     }
     bars.current.drawn = list.at(-1)?.time ?? 0
   }, [poll.data, key])
+
+  useEffect(() => {
+    const c = chartRef.current
+    const list = poll.data
+    if (!c || !list) return
+    const pal = palette(getComputedStyle(document.documentElement))
+    for (const l of drawn.current.lines) c.series.removePriceLine(l)
+    drawn.current.lines = (openTrade && openTrade.symbol === symbol ? tradeLines(openTrade, pal) : []).map((l) =>
+      c.series.createPriceLine({ ...l, lineWidth: 1, axisLabelVisible: true }),
+    )
+    const times = list.map((b) => b.time)
+    const specs = trades ? [...tradeMarkers(entries, symbol, tf, pal), ...dayDots(entries, symbol, tf, pal)] : []
+    const ids = new Map<number, number>()
+    const markers = specs.flatMap(({ id, time, ...m }) => {
+      const at = snapTo(times, time)
+      if (at === null) return []
+      ids.set(at, id)
+      return [{ ...m, time: at as UTCTimestamp }]
+    })
+    drawn.current.ids = ids
+    drawn.current.markers?.setMarkers(markers.sort((a, b) => a.time - b.time))
+  }, [poll.data, entries, openTrade, trades, symbol, tf, themeTick])
 
   const lastClose = poll.data?.at(-1)?.close ?? null
   useEffect(() => onLastClose?.(lastClose), [lastClose, onLastClose])

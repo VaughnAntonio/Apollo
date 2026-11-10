@@ -82,6 +82,8 @@ it('confirming an auto-close keeps its reason', async () => {
   const auto = { ...open, exit: 99.75, exit_reason: 'stop_auto', needs_confirm: true, closed_at: '2026-11-03T16:30:00Z' }
   const f = mockApi({ '/signal': trigger, '/forecast': forecast, 'POST /journal/7/close': auto })
   render(<Rail symbol="MNQ" openTrade={auto} lastClose={99} onTaken={noop} onChanged={noop} />)
+  expect(await screen.findByText('−1.00R')).toBeTruthy() // R at the exit, not at the last price
+  expect(screen.getByText('R at exit')).toBeTruthy()
   fireEvent.click(await screen.findByRole('button', { name: 'Confirm exit' }))
   await vi.waitFor(() => expect(f.mock.calls.some(([u]) => String(u).includes('/close'))).toBe(true))
   const close = f.mock.calls.find(([u]) => String(u).includes('/close'))!

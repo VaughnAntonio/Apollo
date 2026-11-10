@@ -24,3 +24,14 @@ export const toSec = (iso: string) => Math.floor(Date.parse(iso) / 1000)
 
 /** A `datetime-local` value as an ISO time with no zone; the API reads it as New York time. */
 export const toNaiveIso = (local: string) => (local.length === 16 ? `${local}:00` : local)
+
+const yr = new Intl.DateTimeFormat('en-GB', { timeZone: NY, year: 'numeric' })
+const mon = new Intl.DateTimeFormat('en-GB', { timeZone: NY, month: 'short' })
+
+/** Axis labels by lightweight-charts' tick type: 0 year, 1 month, 2 day, then times of day. */
+export function tickLabel(sec: number, type: number): string {
+  if (type === 0) return yr.format(sec * 1000)
+  if (type === 1) return mon.format(sec * 1000)
+  if (type === 2) return nyDay(sec)
+  return nyTime(sec)
+}

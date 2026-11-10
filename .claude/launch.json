@@ -28,7 +28,7 @@
       "url": "http://127.0.0.1:8000"
     },
     {
-      "name": "api-web-5174",
+      "name": "api-sandbox",
       "runtimeExecutable": ".venv/bin/python",
       "runtimeArgs": [
         "-m",
@@ -36,7 +36,9 @@
         "--port",
         "8000",
         "--web-port",
-        "5174"
+        "5174",
+        "--root",
+        ".superpowers/sandbox"
       ],
       "port": 8000,
       "url": "http://127.0.0.1:8000"
