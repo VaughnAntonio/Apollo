@@ -1,6 +1,5 @@
 from datetime import UTC, datetime, timedelta
 from typing import Literal
-from zoneinfo import ZoneInfo
 
 import pandas as pd
 import polars as pl
@@ -99,16 +98,14 @@ def drop_unfinished(
 ) -> pl.DataFrame:
     """Keep only bars that have closed by `now`.
 
-    Daily bars are kept only for dates before today in New York, because Yahoo serves the
-    session still trading as a partial bar. Weekend-dated futures bars are such partials.
+    Yahoo serves the session still trading as a partial bar, so a daily bar waits for its close
+    (17:00 ET for futures, 16:00 ET for stocks). Weekend-dated futures bars are always partials.
     """
-    if interval != "1d":
-        return df.filter(bar_close(interval, kind) <= now.astimezone(UTC))
-    et = pl.col("ts").dt.convert_time_zone("America/New_York")
-    label = (et + timedelta(hours=6) if kind == "future" else et).dt.date()
-    today = now.astimezone(ZoneInfo("America/New_York")).date()
-    keep = label < today
-    if kind == "future":
+    keep = bar_close(interval, kind) <= now.astimezone(UTC)
+    if interval == "1d" and kind == "future":
+        label = (
+            pl.col("ts").dt.convert_time_zone("America/New_York") + timedelta(hours=6)
+        ).dt.date()
         keep = keep & (label.dt.weekday() <= 5)
     return df.filter(keep)
 

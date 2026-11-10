@@ -5,6 +5,8 @@ from pathlib import Path
 
 import polars as pl
 
+from apollo.config import load_symbols
+from apollo.data.resample import to_globex_daily
 from apollo.data.store import read_bars
 
 TIMEFRAMES = ("1m", "5m", "15m", "1h", "4h", "1d")
@@ -17,7 +19,16 @@ def read_tf(
         from apollo.fractal.model import complete_4h
 
         return complete_4h(read_bars(root, code, "1h", start, end))
-    return read_bars(root, code, tf, start, end)  # type: ignore[arg-type]
+    stored = read_bars(root, code, tf, start, end)  # type: ignore[arg-type]
+    if (
+        tf == "1d"
+        and stored.is_empty()
+        and load_symbols()[code].kind == "future"
+        and read_bars(root, code, "1d").is_empty()  # none at all, not just none in this range
+    ):
+        # Yahoo keeps no daily history for some contracts (MCL=F): build them from 1H instead
+        return to_globex_daily(read_bars(root, code, "1h", start, end))
+    return stored
 
 
 def bars_json(df: pl.DataFrame) -> list[dict]:

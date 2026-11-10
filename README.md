@@ -26,6 +26,8 @@ flowchart LR
 
 A GitHub Action collects bars for 14 symbols every weekday evening and commits them to the `data` branch. On your laptop, a FastAPI service reads those bars, runs the models and keeps the journal in DuckDB. The React app talks only to that local API. A second Action exports a read-only snapshot and publishes it to GitHub Pages; the snapshot's journal holds only the case study's public, scaled trades, so the private journal never leaves the laptop.
 
+The chart has TradingView-style drawing tools: trend lines, rays, horizontal and vertical lines, rectangles and Fibonacci retracements. Drawings are saved per symbol in your browser, on the public site too, and stay in place when you change timeframe.
+
 ## Run it
 
 You need Python 3.13 and Node 26. From the repository root:
@@ -89,7 +91,7 @@ The model cards have the details: [regime detector](docs/model-card-regime.md), 
 
 - Free data. Yahoo's bars are delayed, hourly history goes back two years and 5-minute history only 60 days, so the 1H-5m layer has no development trades yet.
 - Small samples. Fourteen trades and a few hundred sessions can't separate a small edge from noise.
-- The 4H chart is built from hourly bars.
+- The 4H chart is built from hourly bars, and so is MCL's daily chart, because Yahoo keeps no daily history for MCL.
 - The rules are one reading of a discretionary method. A setup confirmed outside the entry window is entered at the next session's open, and only if neither the stop nor the target was hit in between.
 
 ## Credits

@@ -75,3 +75,18 @@ def test_daily_futures_weekend_label_dropped(bars):
     now = datetime(2026, 11, 10, 12, 0, tzinfo=ZoneInfo("America/New_York"))
     d = bars("2026-11-07 18:00", 1, "1d")  # dated Sunday 8 November
     assert drop_unfinished(d, "1d", now).height == 0
+
+
+def test_a_daily_bar_is_kept_once_its_session_has_closed(bars):
+    # The collector runs after the close; the session that just ended must be stored that night
+    et = ZoneInfo("America/New_York")
+    fut = bars("2026-11-02 18:00", 1, "1d")  # the Globex day dated Tue 3 November, closes 17:00 ET
+    assert drop_unfinished(fut, "1d", datetime(2026, 11, 3, 16, 59, tzinfo=et)).height == 0
+    assert drop_unfinished(fut, "1d", datetime(2026, 11, 3, 17, 30, tzinfo=et)).height == 1
+    stock = bars("2026-11-03 09:30", 1, "1d")  # closes 16:00 ET
+    assert (
+        drop_unfinished(stock, "1d", datetime(2026, 11, 3, 15, 0, tzinfo=et), "stock").height == 0
+    )
+    assert (
+        drop_unfinished(stock, "1d", datetime(2026, 11, 3, 16, 30, tzinfo=et), "stock").height == 1
+    )
