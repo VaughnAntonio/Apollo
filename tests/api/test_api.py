@@ -196,7 +196,7 @@ def test_signal_days_feed_skipped(client):
 
 
 def test_model_check_last_60():
-    from apollo.api.main import model_check
+    from apollo.models.report import model_check
 
     sessions = [
         {"label": "chop", "proba": {"chop": 0.6, "normal": 0.4}, "hit_both": i % 4 != 0}
@@ -280,3 +280,15 @@ def test_patch_null_reopens_a_trade(client):
         None,
         None,
     )
+
+
+def test_models_endpoint_404_without_report(client):
+    r = client.get("/models", params={"symbol": "MES"})
+    assert r.status_code == 404 and "--ablation" in r.json()["detail"]
+
+
+def test_models_endpoint_adds_the_ledger_summary(client, tmp_path):
+    (tmp_path / "reports/models_MNQ.json").write_text(json.dumps({"both": {"chosen": "logit"}}))
+    body = client.get("/models", params={"symbol": "MNQ"}).json()
+    assert body["both"] == {"chosen": "logit"}
+    assert body["ledger"] == {"since": None, "n": 0, "scored": 0, "hit_both": None}

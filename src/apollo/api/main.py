@@ -93,36 +93,10 @@ class CloseIn(BaseModel):
     reason: str = "manual"
 
 
-def model_check(sessions: list[dict]) -> dict[str, Any]:
-    """Range hit rate and regime accuracy over the last 60 sessions, for the rail."""
-    last = sessions[-60:]
-    if not last:
-        return {"n": 0, "range_hit": None, "regime_accuracy": None}
-    right = sum(max(s["proba"], key=s["proba"].get) == s["label"] for s in last)
-    return {
-        "n": len(last),
-        "range_hit": sum(bool(s["hit_both"]) for s in last) / len(last),
-        "regime_accuracy": right / len(last),
-    }
-
-
 def _default_signal(root: Path, code: str, now: datetime) -> dict[str, Any]:
     from apollo.live.signal import current_signal
 
     return current_signal(root, code, now)
-
-
-def _default_forecast(root: Path, code: str) -> dict[str, Any]:
-    from apollo.models.report import build_report
-
-    r = build_report(root, code)
-    return {
-        "latest": r["latest"],
-        "range": r["range"],
-        "regime_model": r["chosen"],
-        "model_check": model_check(r["sessions"]),
-        "research_only": True,
-    }
 
 
 def create_app(
@@ -132,7 +106,7 @@ def create_app(
     media_dir: Path = Path("journal_media"),
     reports_dir: Path = Path("reports"),
     signal_fn: Callable[[Path, str, datetime], dict[str, Any]] = _default_signal,
-    forecast_fn: Callable[[Path, str], dict[str, Any]] = _default_forecast,
+    forecast_fn: Callable[[Path, str], dict[str, Any]] | None = None,
     web_origin: str = DEV_ORIGIN,
 ) -> FastAPI:
     app = FastAPI(title="Apollo Predictor", description="Research tool. Not financial advice.")
@@ -148,6 +122,14 @@ def create_app(
         if origin is not None and origin != web_origin:
             return JSONResponse({"detail": "origin not allowed"}, status_code=403)
         return await call_next(request)
+
+    if forecast_fn is None:
+        from apollo.models.report import forecast_cached
+
+        def daily(root: Path, code: str) -> dict[str, Any]:
+            return forecast_cached(root, code, datetime.now(NY).date(), reports_dir)
+
+        forecast_fn = daily
 
     store = JournalStore(journal_path or root / "journal.duckdb")
     symbols = load_symbols()
@@ -323,6 +305,17 @@ def create_app(
                 404, "no backtest report yet; run python -m apollo.strategy.backtest"
             )
         return json.loads(path.read_text())
+
+    @app.get("/models")
+    def models(symbol: str) -> Any:
+        from apollo.models.report import ledger_summary
+
+        path = reports_dir / f"models_{known(symbol)}.json"
+        if not path.exists():
+            raise HTTPException(
+                404, "no models report yet; run python -m apollo.models.report --ablation"
+            )
+        return json.loads(path.read_text()) | {"ledger": ledger_summary(root, symbol)}
 
     return app
 
