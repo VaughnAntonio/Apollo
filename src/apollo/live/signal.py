@@ -6,6 +6,7 @@ inferred here. A trade signal ("trigger") needs every row to pass. Research only
 
 from dataclasses import asdict, dataclass
 from datetime import UTC, date, datetime, timedelta
+from functools import lru_cache
 from math import floor
 from pathlib import Path
 from typing import Any
@@ -21,6 +22,14 @@ from apollo.strategy.config import load_trade_config
 
 NY = ZoneInfo("America/New_York")
 FRESH = timedelta(minutes=10)  # a 5m fill this recent still counts as "now"
+
+
+@lru_cache(maxsize=16)
+def _daily_forecasts(root: str, code: str, day: date) -> pl.DataFrame:
+    """Forecasts change once a day; refitting them on every poll would take ~30 s each time."""
+    from apollo.models.report import forecast_frame
+
+    return forecast_frame(Path(root), code)
 
 
 @dataclass
@@ -70,11 +79,9 @@ def current_signal(
         return base | {"status": "no_model"}
     if frames is None:
         assert root is not None
-        from apollo.models.report import forecast_frame  # slow; the API caches the result
-
         frames = {p: run_model(root, code, p) for p in ("D-1H", "4H-15m", "1H-5m")}
         frames["bars_5m"] = read_bars(root, code, "5m")
-        frames["forecasts"] = forecast_frame(root, code)
+        frames["forecasts"] = _daily_forecasts(str(root), code, now.astimezone(NY).date())
     variant = cfg.variants[cfg.live_variant]
     today = now.astimezone(NY).date()
     rows: list[CheckRow] = []
