@@ -47,6 +47,7 @@ class TradeConfig:
     holdout_months: int
     holdout_from: date
     variants: dict[str, Variant]
+    live_variant: str = "plain"
 
 
 def _t(s: str) -> time:
@@ -79,4 +80,5 @@ def load_trade_config(path: Path = CONFIG_DIR / "strategy.toml") -> TradeConfig:
         holdout_months=raw["backtest"]["holdout_months"],
         holdout_from=date.fromisoformat(raw["backtest"]["holdout_from"]),
         variants={k: Variant(*v) for k, v in raw["variants"].items()},
+        live_variant=raw.get("live", {}).get("variant", "plain"),
     )
