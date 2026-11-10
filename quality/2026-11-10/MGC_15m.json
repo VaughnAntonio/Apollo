@@ -1,0 +1,11 @@
+{
+  "symbol": "MGC",
+  "interval": "15m",
+  "rows": 3795,
+  "duplicates": 0,
+  "gaps": [],
+  "bad_ticks": [
+    "2026-10-14T12:30:00+00:00"
+  ],
+  "bad_days": []
+}

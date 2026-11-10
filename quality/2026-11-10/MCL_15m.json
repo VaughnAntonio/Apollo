@@ -1,0 +1,11 @@
+{
+  "symbol": "MCL",
+  "interval": "15m",
+  "rows": 3794,
+  "duplicates": 0,
+  "gaps": [],
+  "bad_ticks": [
+    "2026-09-18T07:30:00+00:00"
+  ],
+  "bad_days": []
+}
