@@ -25,7 +25,7 @@ it('a missing signal or forecast reads as no model', async () => {
 
 it('says the snapshot file is missing rather than asking to start the API', async () => {
   mockFiles({})
-  await expect(staticApi.journal.stats()).rejects.toMatchObject({ status: 404, message: 'Snapshot file missing' })
+  await expect(staticApi.journal.stats()).rejects.toMatchObject({ status: 404, message: 'Build file missing' })
 })
 
 it('refuses writes', async () => {

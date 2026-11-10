@@ -9,13 +9,15 @@ import {
   type Time,
   type UTCTimestamp,
 } from 'lightweight-charts'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api/client'
 import type { Bar, Entry } from '../api/types'
 import { usePoll } from '../api/usePoll'
 import { candleColours, dayDots, mergeBars, palette, snapTo, token, tradeLines, tradeMarkers, type Tf } from '../lib/chart'
 import { crosshairLabel, tickLabel } from '../lib/time'
+import { DrawToolbar } from './DrawToolbar'
 import { Empty, ErrorLine, Skeleton } from './State'
+import { useDrawings } from './useDrawings'
 
 const sec = (t: Time) => t as number
 
@@ -57,6 +59,7 @@ export function Chart({ symbol, tf, entries = [], openTrade = null, trades = tru
   // what the series holds; only the draw effect writes it
   const drawnTo = useRef<{ key: string; time: number }>({ key: '', time: 0 })
   const seq = useRef(0)
+  const drawBusy = useRef(false)
   const key = `${symbol}|${tf}`
 
   const poll = usePoll(
@@ -86,6 +89,7 @@ export function Chart({ symbol, tf, entries = [], openTrade = null, trades = tru
     drawn.current.markers = createSeriesMarkers(series, [])
     // a click on a bar that carries a trade marker opens that trade
     chart.subscribeClick((param) => {
+      if (drawBusy.current) return // the press placed, picked or moved a drawing
       const id = param.time === undefined ? undefined : drawn.current.ids.get(sec(param.time))
       if (id !== undefined) clickRef.current?.(id)
     })
@@ -102,6 +106,13 @@ export function Chart({ symbol, tf, entries = [], openTrade = null, trades = tru
       chartRef.current = null
     }
   }, [])
+
+  const times = useMemo(() => (bars.current.key === key ? (poll.data ?? []).map((b) => b.time) : []), [poll.data, key])
+  const drawColours = useMemo(() => {
+    const css = getComputedStyle(document.documentElement)
+    return { line: token(css, 'brand'), text: token(css, 'muted'), bg: token(css, 'bg') }
+  }, [themeTick])
+  const draw = useDrawings(box, chartRef, symbol, times, drawColours, drawBusy)
 
   useEffect(() => {
     const c = chartRef.current
@@ -148,6 +159,16 @@ export function Chart({ symbol, tf, entries = [], openTrade = null, trades = tru
   return (
     <div className="relative min-h-[440px] min-w-0">
       <div ref={box} className="absolute inset-0" />
+      {!!poll.data?.length && (
+        <DrawToolbar
+          tool={draw.tool}
+          onTool={draw.setTool}
+          selected={draw.selected}
+          count={draw.count}
+          onDelete={draw.remove}
+          onClear={draw.clear}
+        />
+      )}
       {poll.error && !!poll.data?.length && (
         <div className="absolute top-2 left-3 z-10 bg-bg/90 px-2 py-1">
           <ErrorLine error={poll.error} />
