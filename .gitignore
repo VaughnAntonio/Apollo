@@ -12,3 +12,5 @@ dist/
 *.egg-info/
 /review/
 /reports/
+journal_media/
+docs/reviews/journal-export*.csv

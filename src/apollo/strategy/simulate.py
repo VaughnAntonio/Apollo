@@ -20,6 +20,7 @@ from apollo.config import Symbol
 from apollo.data.yahoo import bar_close
 from apollo.strategy.candidates import SCHEMA
 from apollo.strategy.config import TradeConfig, Variant
+from apollo.strategy.walk import walk_trade
 
 NY = ZoneInfo("America/New_York")
 TRADE_SCHEMA = {
@@ -103,35 +104,37 @@ def simulate(
             continue
 
         sign = 1.0 if c["direction"] == "bull" else -1.0
-        entry, stop, target = c["entry"], c["stop"], c["target"]
-        reached_1r = False
+        entry = c["entry"]
         k = int(np.searchsorted(stamps, c["entry_ts"].timestamp()))
-        exit_px = exit_t = reason = None
-        for i in range(k, len(ts)):
-            local = ts[i].astimezone(NY)
-            if local.date() != session or local.time() >= cfg.flat_at:
-                exit_px, exit_t, reason = cl[i - 1], close_ts[i - 1], "flat"
-                break
-            if reached_1r and variant.breakeven:
-                stop = entry if sign * (entry - stop) > 0 else stop
-            worst, best = (lo[i], hi[i]) if sign > 0 else (hi[i], lo[i])
-            peak = max(peak, equity + sign * (best - entry) * pv * contracts)
+
+        def on_bar(
+            i: int, worst: float, best: float, eq=equity, sg=sign, en=entry, n=contracts
+        ) -> None:
+            # the prop-firm threshold trails open profit: best price first, then the worst
+            nonlocal peak, threshold, breached_at
+            peak = max(peak, eq + sg * (best - en) * pv * n)
             threshold = min(peak - acct.drawdown, acct.lock)
-            if (
-                breached_at is None
-                and equity + sign * (worst - entry) * pv * contracts <= threshold
-            ):
+            if breached_at is None and eq + sg * (worst - en) * pv * n <= threshold:
                 breached_at = close_ts[i]
-            if sign * (worst - stop) <= 0:
-                exit_px, exit_t = stop, close_ts[i]
-                reason = "breakeven" if stop == entry else "stop"
-                break
-            if sign * (best - target) >= 0:
-                exit_px, exit_t, reason = target, close_ts[i], "target"
-                break
-            if sign * (best - entry) >= c["planned_stop_pts"]:
-                reached_1r = True  # takes effect from the next bar
-        if exit_px is None:  # data ended while in the trade
+
+        exit_px, exit_t, reason = walk_trade(
+            ts,
+            close_ts,
+            hi,
+            lo,
+            cl,
+            k,
+            session,
+            entry,
+            c["stop"],
+            c["target"],
+            sign,
+            c["planned_stop_pts"],
+            cfg.flat_at,
+            variant.breakeven,
+            on_bar,
+        )
+        if exit_px is None or exit_t is None:  # data ended while in the trade
             exit_px, exit_t, reason = cl[-1], close_ts[-1], "flat"
 
         gross = sign * (exit_px - entry) * pv * contracts
