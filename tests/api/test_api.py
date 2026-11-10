@@ -193,3 +193,90 @@ def test_take_twice_refused(client):
 def test_signal_days_feed_skipped(client):
     client.get("/signal", params={"symbol": "MNQ"})  # a trigger nobody took
     assert client.get("/journal/stats").json()["stats"]["skipped"] == ["2026-11-03"]
+
+
+def test_model_check_last_60():
+    from apollo.api.main import model_check
+
+    sessions = [
+        {"label": "chop", "proba": {"chop": 0.6, "normal": 0.4}, "hit_both": i % 4 != 0}
+        for i in range(80)
+    ]
+    sessions[-1]["proba"] = {"chop": 0.1, "normal": 0.9}
+    mc = model_check(sessions)
+    assert mc["n"] == 60
+    assert mc["range_hit"] == pytest.approx(45 / 60)
+    assert mc["regime_accuracy"] == pytest.approx(59 / 60)
+    assert model_check([]) == {"n": 0, "range_hit": None, "regime_accuracy": None}
+
+
+def test_auto_close_endpoint(client):
+    assert client.post("/journal/auto-close", params={"symbol": "MNQ"}).json() == {"closed": []}
+    body = MANUAL | {"opened_at": "2026-11-03T09:00:00", "target": 200.0, "stop": 0.5}
+    i = client.post("/journal", json=body).json()["id"]
+    r = client.post("/journal/auto-close", params={"symbol": "MNQ"})
+    assert r.status_code == 200 and r.json() == {"closed": [i]}  # the 15:00 bar flats it
+    e = client.get(f"/journal/{i}").json()
+    assert e["needs_confirm"] is True and e["exit"] == 106.0
+
+
+def test_media_serves_only_uploaded_names(client):
+    i = client.post("/journal", json=MANUAL).json()["id"]
+    up = client.post(
+        f"/journal/{i}/screenshot", files={"file": ("a.png", b"\x89PNG", "image/png")}
+    ).json()
+    got = client.get("/media/" + up["screenshot"].removeprefix("journal_media/"))
+    assert got.status_code == 200 and got.headers["content-type"] == "image/png"
+    for bad in ["../j.duckdb", "x.png", "1-abc.png", "..%2Fj.duckdb"]:
+        assert client.get(f"/media/{bad}").status_code == 404
+
+
+def test_web_origin_can_move_to_another_local_port(tmp_path):
+    app = create_app(
+        tmp_path, journal_path=tmp_path / "j.duckdb", web_origin="http://localhost:5174"
+    )
+    c = TestClient(app, base_url="http://localhost")
+    assert c.get("/healthz", headers={"Origin": "http://localhost:5174"}).status_code == 200
+    assert c.get("/healthz", headers={"Origin": "http://localhost:5173"}).status_code == 403
+
+
+def test_concurrent_first_calls_share_one_forecast(tmp_path):
+    import threading
+    import time
+    from concurrent.futures import ThreadPoolExecutor
+
+    calls, lock = [], threading.Lock()
+
+    def slow_forecast(root, code):
+        with lock:
+            calls.append(code)
+        time.sleep(0.3)
+        return {"latest": {}, "research_only": True}
+
+    app = create_app(tmp_path, journal_path=tmp_path / "j.duckdb", forecast_fn=slow_forecast)
+    c = TestClient(app, base_url="http://localhost")
+    with ThreadPoolExecutor(4) as pool:
+        codes = list(
+            pool.map(lambda _: c.get("/forecast", params={"symbol": "MNQ"}).status_code, range(4))
+        )
+    assert codes == [200] * 4 and calls == ["MNQ"]
+
+
+def test_patch_null_reopens_a_trade(client):
+    i = client.post("/journal", json=MANUAL).json()["id"]
+    client.post(f"/journal/{i}/close", json={"exit": 105.0, "reason": "target"})
+    body = {
+        "exit": None,
+        "closed_at": None,
+        "exit_reason": None,
+        "needs_confirm": False,
+        "target": None,
+    }
+    e = client.patch(f"/journal/{i}", json=body).json()
+    assert (e["exit"], e["closed_at"], e["exit_reason"], e["target"], e["r"]) == (
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
