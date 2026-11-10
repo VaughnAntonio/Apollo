@@ -1,0 +1,101 @@
+name: Publish snapshot
+
+# After each nightly collection, rebuild the public read-only site on GitHub Pages.
+# The private journal never reaches CI: a fresh journal holds only the case study's public,
+# scaled trades. If the build fails, nothing deploys and yesterday's site stays up.
+on:
+  workflow_run:
+    workflows: ["Collect bars"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check out the data branch into data_store/
+        run: |
+          git fetch --depth 1 origin data
+          git worktree add data_store origin/data
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - run: python -m venv .venv && .venv/bin/pip install -e .
+
+      - name: Import the case study's public trades into a fresh journal
+        run: |
+          git clone --depth 1 https://github.com/VaughnAntonio/mnq-trading-case-study.git case_study
+          .venv/bin/python -m apollo.journal.importer --csv-dir case_study/data/public --db snap_journal.duckdb
+
+      - name: Models and backtests, MNQ
+        continue-on-error: true
+        run: |
+          .venv/bin/python -m apollo.models.report --root data_store --symbol MNQ --ablation
+          .venv/bin/python -m apollo.strategy.backtest --root data_store --symbol MNQ --layer D-1H
+          .venv/bin/python -m apollo.strategy.backtest --root data_store --symbol MNQ --layer 1H-5m
+
+      - name: Models and backtests, MES
+        continue-on-error: true
+        run: |
+          .venv/bin/python -m apollo.models.report --root data_store --symbol MES --ablation
+          .venv/bin/python -m apollo.strategy.backtest --root data_store --symbol MES --layer D-1H
+          .venv/bin/python -m apollo.strategy.backtest --root data_store --symbol MES --layer 1H-5m
+
+      - name: Models and backtests, M2K
+        continue-on-error: true
+        run: |
+          .venv/bin/python -m apollo.models.report --root data_store --symbol M2K --ablation
+          .venv/bin/python -m apollo.strategy.backtest --root data_store --symbol M2K --layer D-1H
+          .venv/bin/python -m apollo.strategy.backtest --root data_store --symbol M2K --layer 1H-5m
+
+      - name: Models and backtests, MYM
+        continue-on-error: true
+        run: |
+          .venv/bin/python -m apollo.models.report --root data_store --symbol MYM --ablation
+          .venv/bin/python -m apollo.strategy.backtest --root data_store --symbol MYM --layer D-1H
+          .venv/bin/python -m apollo.strategy.backtest --root data_store --symbol MYM --layer 1H-5m
+
+      - name: Export the snapshot
+        run: .venv/bin/python -m apollo.export.snapshot --root data_store --journal snap_journal.duckdb --reports reports --out web/public/snapshot
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Build the static site
+        run: |
+          npm ci --prefix web
+          VITE_MODE=static VITE_BASE=/Apollo/ npm --prefix web run build
+          cp web/dist/index.html web/dist/404.html
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

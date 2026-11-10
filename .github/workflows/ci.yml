@@ -26,3 +26,4 @@ jobs:
       - run: npm --prefix web run typecheck
       - run: npm --prefix web test
       - run: npm --prefix web run build
+      - run: VITE_MODE=static VITE_BASE=/Apollo/ npm --prefix web run build
