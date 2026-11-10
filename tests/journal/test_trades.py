@@ -150,3 +150,65 @@ def test_take_trade_refuses_a_second_open_trade(tmp_path):
     take_trade(s, SIGNAL, None)
     with pytest.raises(ValueError, match="already open"):
         take_trade(s, SIGNAL, None)
+
+
+EVENING = {
+    "opened_at": datetime(2026, 11, 3, 19, tzinfo=NY),  # after the 16:00 flat time
+    "symbol": "MNQ",
+    "side": "long",
+    "entry": 102.0,
+    "stop": 99.75,
+    "target": 105.0,
+    "size": 1,
+    "source": "manual",
+}
+
+
+def test_auto_close_stops_a_trade_opened_in_the_evening(tmp_path, ohlc):
+    s = JournalStore(tmp_path / "j.duckdb")
+    i = s.add(EVENING)
+    bars = ohlc([(102, 103, 101.5, 102.5), (102.5, 103, 99, 100)], "2026-11-03 19:00", "1h")
+    assert auto_close(s, {"MNQ": bars}, datetime(2026, 11, 4, 3, tzinfo=UTC)) == [i]
+    e = s.get(i)
+    assert e is not None and (e["exit_reason"], e["exit"]) == ("stop_auto", 99.75)
+
+
+def test_an_evening_trade_goes_flat_at_the_next_1600(tmp_path, ohlc):
+    s = JournalStore(tmp_path / "j.duckdb")
+    i = s.add(EVENING)
+    quiet = [(102, 103, 101.5, 102.5)] * 22  # 19:00 Nov 3 to 16:00 Nov 4, never near stop or target
+    bars = ohlc(quiet, "2026-11-03 19:00", "1h")
+    assert auto_close(s, {"MNQ": bars}, datetime(2026, 11, 4, 20, tzinfo=UTC)) == []  # 15:00 ET
+    assert auto_close(s, {"MNQ": bars}, datetime(2026, 11, 4, 23, tzinfo=UTC)) == [i]
+    e = s.get(i)
+    assert e is not None and (e["exit_reason"], e["exit"]) == ("flat_auto", 102.5)
+    assert e["closed_at"] == datetime(2026, 11, 4, 16, tzinfo=NY)  # the 15:00 bar's close
+
+
+def test_two_takes_at_once_open_one_trade(tmp_path, monkeypatch):
+    import threading
+    import time
+
+    s = JournalStore(tmp_path / "j.duckdb")
+    real = s.list
+
+    def slow_list(**kw):
+        rows = real(**kw)
+        time.sleep(0.2)  # both requests have read the journal before either writes
+        return rows
+
+    monkeypatch.setattr(s, "list", slow_list)
+    results = []
+
+    def take():
+        try:
+            results.append(take_trade(s, SIGNAL, None))
+        except ValueError as e:
+            results.append(e)
+
+    threads = [threading.Thread(target=take) for _ in range(2)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert sum(isinstance(r, int) for r in results) == 1 and len(real()) == 1

@@ -122,3 +122,17 @@ def test_missing_reports_are_listed_for_model_symbols(tmp_path, store_with_bars)
     missing = {(m["what"], m["symbol"]) for m in meta["missing"]}
     assert ("models", "MNQ") in missing and ("backtest", "MNQ") in missing
     assert ("models", "NVDA") not in missing  # stocks have no model to report on
+
+
+def test_a_failed_export_removes_the_file_from_an_earlier_run(
+    tmp_path, store_with_bars, monkeypatch
+):
+    run(store_with_bars, tmp_path)
+    assert (tmp_path / "out/signal/MNQ.json").exists()
+
+    def fail(root, code, now):
+        raise ValueError("no bars today")
+
+    monkeypatch.setattr(snapshot, "current_signal", fail)
+    run(store_with_bars, tmp_path)
+    assert not (tmp_path / "out/signal/MNQ.json").exists()  # never yesterday's signal as today's

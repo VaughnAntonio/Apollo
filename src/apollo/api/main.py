@@ -11,7 +11,7 @@ import uuid
 from collections import defaultdict
 from collections.abc import Callable
 from datetime import UTC, datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Annotated, Any, Literal
 from zoneinfo import ZoneInfo
 
@@ -25,7 +25,7 @@ from apollo.config import load_symbols
 from apollo.data.serve import TIMEFRAMES, bars_json, read_tf
 from apollo.data.store import read_bars
 from apollo.journal.stats import calendar, journal_stats
-from apollo.journal.store import JournalStore
+from apollo.journal.store import JournalStore, NoSuchEntry
 from apollo.journal.trades import auto_close, close_trade, take_trade
 
 DEV_ORIGIN = "http://localhost:5173"  # Plan 6's Vite dev server; nothing else may call the API
@@ -155,9 +155,15 @@ def create_app(
     async def bad_input(_: Request, exc: ValueError) -> JSONResponse:
         return JSONResponse({"detail": str(exc)}, status_code=422)
 
-    @app.exception_handler(KeyError)
-    async def missing(_: Request, exc: KeyError) -> JSONResponse:
-        return JSONResponse({"detail": f"not found: {exc}"}, status_code=404)
+    # only the journal's own "no such row": a stray KeyError is a bug and stays a 500
+    @app.exception_handler(NoSuchEntry)
+    async def missing(_: Request, exc: NoSuchEntry) -> JSONResponse:
+        return JSONResponse({"detail": "no such entry"}, status_code=404)
+
+    def drop_media(shot: str | None) -> None:
+        name = PurePosixPath(shot).name if shot else ""
+        if MEDIA_NAME.fullmatch(name):  # only files the upload route made
+            (media_dir / name).unlink(missing_ok=True)
 
     @app.get("/healthz")
     def healthz() -> dict:
@@ -263,8 +269,10 @@ def create_app(
 
     @app.delete("/journal/{id}")
     def delete(id: int) -> dict:
-        if not store.delete(id):
+        e = store.get(id)
+        if e is None or not store.delete(id):
             raise HTTPException(404, "no such entry")
+        drop_media(e["screenshot"])
         return {"deleted": True}
 
     @app.post("/journal/{id}/close")
@@ -273,7 +281,8 @@ def create_app(
 
     @app.post("/journal/{id}/screenshot")
     async def screenshot(id: int, file: Annotated[UploadFile, File()]) -> dict:
-        if store.get(id) is None:
+        before = store.get(id)
+        if before is None:
             raise HTTPException(404, "no such entry")
         ext = IMAGE_TYPES.get(file.content_type or "")
         if ext is None:
@@ -284,7 +293,9 @@ def create_app(
         media_dir.mkdir(parents=True, exist_ok=True)
         name = f"{id}-{uuid.uuid4().hex}.{ext}"  # never the uploaded name
         (media_dir / name).write_bytes(data)
-        return store.update(id, {"screenshot": f"journal_media/{name}"})
+        after = store.update(id, {"screenshot": f"journal_media/{name}"})
+        drop_media(before["screenshot"])  # the one this upload replaced
+        return after
 
     @app.get("/media/{name}")
     def media(name: str) -> FileResponse:

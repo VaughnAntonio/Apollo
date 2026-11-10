@@ -27,15 +27,21 @@ def walk_trade(
     flat_at: time,
     breakeven: bool = False,
     on_bar: Callable[[int, float, float], None] | None = None,
+    flat_ts: datetime | None = None,
 ) -> tuple[float | None, datetime | None, str]:
     """Return (exit price, exit time, reason). The reason is "open" when the bars run out first.
 
     `on_bar(i, worst, best)` runs on every bar the trade is open, before the exit checks.
+    `flat_ts` replaces the session rule: the trade is flat at the first bar opening at or after it.
     """
     reached_1r = False
     for i in range(k, len(ts)):
         local = ts[i].astimezone(NY)
-        if local.date() != session or local.time() >= flat_at:
+        if (
+            ts[i] >= flat_ts
+            if flat_ts is not None
+            else local.date() != session or local.time() >= flat_at
+        ):
             if i == k:  # the trade never had a bar inside the session
                 return None, None, "open"
             return cl[i - 1], close_ts[i - 1], "flat"

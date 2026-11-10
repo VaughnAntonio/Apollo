@@ -13,7 +13,7 @@ from zoneinfo import ZoneInfo
 
 import duckdb
 
-from apollo.config import load_symbols
+from apollo.config import Symbol, load_symbols
 
 SIDES = {"long": 1.0, "short": -1.0}
 STAGES = {"backtest", "forward_test", "eval", "funded", "live"}
@@ -93,6 +93,10 @@ def _validate(e: dict[str, Any]) -> None:
         raise ValueError("tags must be a list")  # noqa: TRY004 - every bad input is a ValueError (422)
 
 
+class NoSuchEntry(LookupError):
+    """No journal row has this id. The API answers 404."""
+
+
 class JournalStore:
     def __init__(self, path: Path) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -106,19 +110,25 @@ class JournalStore:
     def _db(self) -> duckdb.DuckDBPyConnection:
         return duckdb.connect(str(self.path))
 
-    def _row(self, values: tuple, names: list[str]) -> dict[str, Any]:
+    def _row(self, values: tuple, names: list[str], symbols: dict[str, Symbol]) -> dict[str, Any]:
         e = dict(zip(names, values, strict=True))
         for f in JSON_FIELDS:
             e[f] = json.loads(e[f]) if e[f] is not None else ([] if f == "tags" else None)
-        return self._derive(e)
+        return self._derive(e, symbols)
 
     @staticmethod
-    def _derive(e: dict[str, Any]) -> dict[str, Any]:
-        pv = load_symbols()[e["symbol"]].point_value
+    def _derive(e: dict[str, Any], symbols: dict[str, Symbol]) -> dict[str, Any]:
+        sym = symbols.get(e["symbol"])  # None once a symbol has left the config: no point value
         risk = pnl = r = None
         if e.get("imported_r") is not None:  # case-study rows carry their own result
             r, pnl = e["imported_r"], e.get("imported_pnl")
-        elif e.get("entry") is not None and e.get("initial_stop") is not None and e.get("size"):
+        elif (
+            sym is not None
+            and e.get("entry") is not None
+            and e.get("initial_stop") is not None
+            and e.get("size")
+        ):
+            pv = sym.point_value
             risk = abs(e["entry"] - e["initial_stop"]) * pv * e["size"]
             if e.get("exit") is not None:
                 pnl = SIDES[e["side"]] * (e["exit"] - e["entry"]) * pv * e["size"] - (
@@ -154,7 +164,7 @@ class JournalStore:
             cur = db.execute("SELECT * FROM journal WHERE id = ?", [id])
             row = cur.fetchone()
             names = [d[0] for d in cur.description]
-        return self._row(row, names) if row else None
+        return self._row(row, names, load_symbols()) if row else None
 
     def record_signal_day(self, day: date) -> None:
         """Remember that a trade signal fired on this NY date, for the "skipped" stat."""
@@ -187,7 +197,8 @@ class JournalStore:
             cur = db.execute(sql + " ORDER BY opened_at DESC, id DESC", args)
             rows = cur.fetchall()
             names = [d[0] for d in cur.description]
-        return [self._row(r, names) for r in rows]
+        symbols = load_symbols()  # once per listing, not once per row
+        return [self._row(r, names, symbols) for r in rows]
 
     def update(self, id: int, changes: dict[str, Any]) -> dict[str, Any]:
         frozen = FROZEN & set(changes)
@@ -198,7 +209,7 @@ class JournalStore:
             raise ValueError(f"unknown fields: {sorted(unknown)}")
         current = self.get(id)
         if current is None:
-            raise KeyError(id)
+            raise NoSuchEntry(id)
         _validate(current | changes)
         vals = {
             k: (json.dumps(v) if k in JSON_FIELDS and v is not None else _ny(v))
