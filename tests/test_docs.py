@@ -17,7 +17,11 @@ def test_readme_has_the_essentials():
 
 def test_each_model_card_has_every_section():
     for card in CARDS:
-        headings = {line.removeprefix("## ").strip() for line in card.read_text().splitlines() if line.startswith("## ")}
+        headings = {
+            line.removeprefix("## ").strip()
+            for line in card.read_text().splitlines()
+            if line.startswith("## ")
+        }
         assert set(HEADINGS) <= headings, card
 
 
