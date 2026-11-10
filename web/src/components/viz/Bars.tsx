@@ -13,7 +13,7 @@ export function Bars({ bins, label, height = 160 }: Props) {
   const every = Math.ceil(bins.length / 12) // keep the axis labels from colliding
   const summary = `${label}. ${bins.map((b) => `${b.label}: ${b.value}`).join(', ')}.`
   return (
-    <svg role="img" aria-label={summary} viewBox={`0 0 ${W} ${height}`} className="h-auto w-full">
+    <svg role="img" aria-label={summary} viewBox={`0 0 ${W} ${height}`} className="h-auto w-full max-w-3xl">
       <line x1={0} x2={W} y1={base} y2={base} stroke="var(--line)" />
       {bins.map((b, i) => {
         const h = (b.value / max) * (base - PAD.t)
