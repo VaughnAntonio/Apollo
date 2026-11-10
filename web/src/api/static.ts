@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ApiError } from './error'
-import type { Bar, Entry, Forecast, JournalStats, Signal, Sym } from './types'
+import type { BacktestRecord, Bar, Entry, Forecast, JournalStats, Layer, Signal, Sym } from './types'
 
 export const MISSING = 'Snapshot file missing'
 const READ_ONLY = 'This is a read-only snapshot'
@@ -45,6 +45,7 @@ export const staticApi = {
   signal: async (symbol: string) => (await file<Signal>(`signal/${symbol}.json`)) ?? NO_SIGNAL(symbol),
   forecast: async (symbol: string): Promise<Forecast> =>
     (await file<Forecast>(`forecast/${symbol}.json`)) ?? { status: 'no_model', research_only: true },
+  backtest: (symbol: string, layer: Layer) => need<BacktestRecord[]>(`backtest/${symbol}_${layer}.json`),
   journal: {
     list: async () => (await file<Entry[]>('journal.json')) ?? [],
     get: async (id: number) => {

@@ -5,6 +5,7 @@ import { Chart } from './components/Chart'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { Menu, useHashPage, type Page } from './components/Menu'
 import { Placeholder } from './components/Placeholder'
+import { Backtest } from './components/pages/Backtest'
 import { Sheet } from './components/journal/Sheet'
 import { Rail } from './components/Rail'
 import { TickerPicker } from './components/TickerPicker'
@@ -94,7 +95,7 @@ export default function App() {
         </main>
       ) : (
         <main className="overflow-auto">
-          <Placeholder title={TITLES[page]} />
+          {page === 'backtest' ? <Backtest symbol={symbol} /> : <Placeholder title={TITLES[page]} />}
         </main>
       )}
       <Sheet

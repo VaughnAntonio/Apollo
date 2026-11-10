@@ -116,3 +116,27 @@ export type JournalStats = {
   }
   calendar: Day[]
 }
+
+export type Layer = 'D-1H' | '1H-5m'
+export type Point = { date: string; usd: number }
+export type MonteCarlo = { p_pass: number | null; p_breach: number | null; median_trades_to_pass: number | null }
+
+/** One variant of a development (or final) backtest, as reports/backtest_<code>_<layer>.json holds it. */
+export type BacktestRecord = {
+  code: string
+  layer: Layer
+  variant: string
+  final: boolean
+  holdout_from: string
+  period: { start: string | null; end: string | null }
+  n_setups: number
+  skip_counts: Record<string, number>
+  expectancy: { n: number; mean: number | null; low: number | null; high: number | null; win_rate: number | null }
+  equity: { 'net_$': number; 'max_dd_$': number; max_dd_r: number; profit_factor: number | null; trades_per_month: number }
+  monte_carlo: Record<'1%' | '2%', MonteCarlo>
+  benchmarks: { 'buy_hold_$'?: number; 'ma_20_50_$'?: number }
+  trades?: { session: string; direction: string; r: number | null; 'net_$': number | null; exit_reason: string | null }[]
+  curves?: { strategy: Point[]; buy_hold?: Point[]; ma_20_50?: Point[] }
+  monthly?: { month: string; n: number; r: number; 'net_$': number }[]
+  attempt?: number
+}
