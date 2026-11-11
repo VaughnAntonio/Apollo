@@ -66,13 +66,13 @@ export const staticApi = {
   },
 }
 
-/** The day the snapshot was taken, from meta.json; null until it loads or if it's missing. */
+/** When the build was exported (an ISO time), from meta.json; null until it loads or if it's missing. */
 export function useSnapshotDate(): string | null {
   const [date, setDate] = useState<string | null>(null)
   useEffect(() => {
     let live = true
-    file<{ date: string }>('meta.json')
-      .then((m) => live && setDate(m?.date ?? null))
+    file<{ generated: string }>('meta.json')
+      .then((m) => live && setDate(m?.generated ?? null))
       .catch(() => {})
     return () => {
       live = false

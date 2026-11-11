@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { useSnapshotDate } from '../api/static'
 import { isStatic } from '../lib/mode'
 import { TIMEFRAMES, type Tf } from '../lib/chart'
+import { nyDay, nyTime, toSec } from '../lib/time'
 
 type Props = {
   tf: Tf
@@ -14,6 +15,8 @@ type Props = {
 
 export function TopBar({ tf, onTf, trades, onTrades, left, chart = true }: Props) {
   const snapshot = useSnapshotDate()
+  // the label changes with every build, so a new one is easy to spot
+  const built = snapshot ? `Build ${nyDay(toSec(snapshot))}, ${nyTime(toSec(snapshot))} ET` : 'Build'
   return (
     <header className="flex flex-wrap items-center gap-6 border-b px-5 py-3">
       {left}
@@ -52,7 +55,7 @@ export function TopBar({ tf, onTf, trades, onTrades, left, chart = true }: Props
           Trades
         </button>
         )}
-        <span>{isStatic() ? (snapshot ? `Build ${snapshot}` : 'Build') : 'Delayed 10m'}</span>
+        <span>{isStatic() ? built : 'Delayed 10m'}</span>
       </div>
     </header>
   )
