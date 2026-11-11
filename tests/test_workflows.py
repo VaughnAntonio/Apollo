@@ -60,3 +60,9 @@ def test_no_workflow_puts_event_text_into_a_shell():
     for path in Path(".github/workflows").glob("*.yml"):
         runs = re.findall(r"run: (?:\|\n(?:\s{8,}.*\n?)+|.*)", path.read_text())
         assert not any("${{ github.event" in r or "${{ github.head_ref" in r for r in runs), path
+
+
+def test_a_push_to_main_that_changes_the_site_publishes_it():
+    text = PUBLISH.read_text()
+    assert "  push:\n    branches: [main]\n" in text
+    assert "github.event_name != 'workflow_run'" in text  # pushes and manual runs always build

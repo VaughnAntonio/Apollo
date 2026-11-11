@@ -1,12 +1,16 @@
 name: Publish snapshot
 
-# After each nightly collection, rebuild the public read-only site on GitHub Pages.
+# After each nightly collection, and after a push to main that changes the app, rebuild the
+# public read-only site on GitHub Pages.
 # The private journal never reaches CI: a fresh journal holds only the case study's public,
 # scaled trades. If the build fails, nothing deploys and yesterday's site stays up.
 on:
   workflow_run:
     workflows: ["Collect bars"]
     types: [completed]
+  push:
+    branches: [main]
+    paths: ["src/**", "web/**", "config/**", "pyproject.toml", ".github/workflows/publish.yml"]
   workflow_dispatch:
 
 permissions:
@@ -20,7 +24,7 @@ concurrency:
 
 jobs:
   build:
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
