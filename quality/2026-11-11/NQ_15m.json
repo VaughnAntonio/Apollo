@@ -1,0 +1,11 @@
+{
+  "symbol": "NQ",
+  "interval": "15m",
+  "rows": 3880,
+  "duplicates": 0,
+  "gaps": [],
+  "bad_ticks": [
+    "2026-11-05T14:30:00+00:00"
+  ],
+  "bad_days": []
+}

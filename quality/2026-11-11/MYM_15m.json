@@ -1,0 +1,11 @@
+{
+  "symbol": "MYM",
+  "interval": "15m",
+  "rows": 3877,
+  "duplicates": 0,
+  "gaps": [],
+  "bad_ticks": [
+    "2026-09-14T07:30:00+00:00"
+  ],
+  "bad_days": []
+}

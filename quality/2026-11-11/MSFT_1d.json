@@ -1,0 +1,11 @@
+{
+  "symbol": "MSFT",
+  "interval": "1d",
+  "rows": 10245,
+  "duplicates": 0,
+  "gaps": [],
+  "bad_ticks": [
+    "2006-04-28T13:30:00+00:00"
+  ],
+  "bad_days": []
+}
