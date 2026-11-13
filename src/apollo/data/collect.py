@@ -14,7 +14,8 @@ import polars as pl
 
 from apollo.config import Symbol, load_symbols
 from apollo.data.quality import check_quality
-from apollo.data.store import append_bars
+from apollo.data.resample import to_globex_daily
+from apollo.data.store import append_bars, read_bars
 from apollo.data.yahoo import Interval, fetch_bars
 
 log = logging.getLogger(__name__)
@@ -47,7 +48,27 @@ def collect(
                 log.info("%s: %d rows", key, written[key])
             except Exception as e:  # noqa: BLE001 - any error must skip only this pair
                 log.warning("%s: failed: %s", key, e)
+        if sym.kind == "future" and {"1d", "1h"} <= set(intervals):
+            try:
+                _daily_from_hourly(root, sym.code)
+            except Exception as e:  # noqa: BLE001
+                log.warning("%s/1d: rebuild from 1h failed: %s", sym.code, e)
     return written
+
+
+def _daily_from_hourly(root: Path, code: str) -> None:
+    """Replace the last week's futures daily bars with ones built from the stored 1H bars.
+
+    The nightly job often starts after 18:00 ET. By then Yahoo files the new session's first hours
+    under today's date, and that partial bar would replace the finished day. Hourly bars carry no
+    such label, so the days they cover are rebuilt from them. A first day whose hours start after
+    its 18:00 ET open is only part of a session, so it is left as it was.
+    """
+    hourly = read_bars(root, code, "1h").tail(24 * 7)
+    daily = to_globex_daily(hourly)
+    if not daily.is_empty() and hourly["ts"][0] > daily["ts"][0]:
+        daily = daily.slice(1)
+    append_bars(root, daily, "1d")
 
 
 def main(argv: list[str] | None = None) -> int:
