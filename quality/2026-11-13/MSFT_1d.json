@@ -1,7 +1,7 @@
 {
   "symbol": "MSFT",
   "interval": "1d",
-  "rows": 10247,
+  "rows": 10248,
   "duplicates": 0,
   "gaps": [],
   "bad_ticks": [

@@ -1,7 +1,7 @@
 {
   "symbol": "AAPL",
   "interval": "1m",
-  "rows": 1560,
+  "rows": 1950,
   "duplicates": 0,
   "gaps": [],
   "bad_ticks": [

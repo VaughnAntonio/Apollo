@@ -1,7 +1,7 @@
 {
   "symbol": "NVDA",
   "interval": "1d",
-  "rows": 6996,
+  "rows": 6997,
   "duplicates": 0,
   "gaps": [],
   "bad_ticks": [
