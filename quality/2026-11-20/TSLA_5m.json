@@ -1,0 +1,9 @@
+{
+  "symbol": "TSLA",
+  "interval": "5m",
+  "rows": 3354,
+  "duplicates": 0,
+  "gaps": [],
+  "bad_ticks": [],
+  "bad_days": []
+}
