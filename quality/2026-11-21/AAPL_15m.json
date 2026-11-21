@@ -1,0 +1,9 @@
+{
+  "symbol": "AAPL",
+  "interval": "15m",
+  "rows": 1118,
+  "duplicates": 0,
+  "gaps": [],
+  "bad_ticks": [],
+  "bad_days": []
+}
