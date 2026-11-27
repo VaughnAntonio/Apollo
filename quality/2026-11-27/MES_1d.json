@@ -1,7 +1,7 @@
 {
   "symbol": "MES",
   "interval": "1d",
-  "rows": 1907,
+  "rows": 1906,
   "duplicates": 0,
   "gaps": [],
   "bad_ticks": [],
